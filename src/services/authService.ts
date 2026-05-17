@@ -1,6 +1,6 @@
 // Authentication service for user login, registration, and token management
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com/api';
 
 export interface User {
   id: number;

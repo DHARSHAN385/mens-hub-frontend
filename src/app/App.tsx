@@ -1316,7 +1316,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
     setIsCreatingOrder(true);
     try {
       const authToken = localStorage.getItem('authToken');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
 
       // Format order items from cart
       const orderItems = cart.map((item: CartItem) => {
@@ -1696,7 +1696,7 @@ function OrdersPage({ user, onBack }: any) {
         return;
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
       const url = `${API_URL}/api/orders/my_orders/`;
       console.log('Fetching orders from:', url);
 
@@ -1759,7 +1759,7 @@ function OrdersPage({ user, onBack }: any) {
     setExchangeRequesting(true);
     try {
       const authToken = localStorage.getItem('authToken');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
       
       const response = await fetch(`${API_URL}/api/orders/${selectedOrder.id}/request_exchange/`, {
         method: 'POST',
@@ -2196,7 +2196,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
         const authToken = localStorage.getItem('authToken');
         if (!authToken) return;
 
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
         const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/status/`, {
           method: 'PATCH',
           headers: {
@@ -2317,7 +2317,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
       const response = await fetch(`${API_URL}/api/admin/orders/`, {
         method: 'GET',
         headers: {
@@ -2348,7 +2348,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
     setUpdatingStatus(true);
     try {
       const authToken = localStorage.getItem('authToken');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
       
       const orderId = typeof selectedOrder === 'object' ? selectedOrder.id : selectedOrder;
       const payload: any = { tracking_number: trackingId };
