@@ -79,20 +79,26 @@ WSGI_APPLICATION = 'backend_project.wsgi.application'
 ASGI_APPLICATION = 'backend_project.asgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+DB_ENGINE = config('DB_ENGINE', default='django.db.backends.mysql')
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'mens_hub_db',
-        'USER': 'root',
-        'PASSWORD': '1127',
-        'HOST': 'localhost',
-        'PORT': '3306',
-        # 'OPTIONS': { 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'" },
+if DB_ENGINE == 'django.db.backends.sqlite3':
+    DATABASES = {
+        'default': {
+            'ENGINE': DB_ENGINE,
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': DB_ENGINE,
+            'NAME': config('DB_NAME', default='mens_hub_db'),
+            'USER': config('DB_USER', default='root'),
+            'PASSWORD': config('DB_PASSWORD', default='1127'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='3306'),
+        }
+    }
 
 
 # Password validation
