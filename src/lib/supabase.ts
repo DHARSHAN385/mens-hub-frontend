@@ -26,7 +26,7 @@
 export const dbConfig = {
   type: 'mysql',
   backend: 'Django REST Framework',
-  apiUrl: 'http://localhost:8000',
+  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
   apiBasePath: '/api',
   database: 'men_hub_db',
 } as const;
