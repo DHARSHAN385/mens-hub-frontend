@@ -2,7 +2,7 @@
 // This file handles all communication with the Django backend
 
 // Base URL for all API requests
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
 
 // Get authentication token from localStorage
 const getAuthToken = (): string | null => {
