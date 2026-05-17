@@ -1,0 +1,4 @@
+            <button key={c.id} onClick={() => onCategory(c.id)} className="group">
+              <div className="aspect-square overflow-hidden rounded-xl bg-neutral-200 dark:bg-neutral-800" style={{ border: "1px solid var(--accent)" }}>
+                <img src={c.img} className="w-full h-full object-cover group-hover:scale-105 transition" />
+              </div>

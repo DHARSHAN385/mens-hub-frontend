@@ -1,0 +1,16 @@
+{
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "basic",
+  "venvPath": ".",
+  "venv": ".venv",
+  "include": [
+    "api",
+    "src"
+  ],
+  "extraPaths": [
+    ".",
+    "./api",
+    "./.venv/Lib/site-packages"
+  ]
+}

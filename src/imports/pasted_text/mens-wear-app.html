@@ -1,0 +1,338 @@
+Design a premium, modern, fully responsive MEN'S WEAR e-commerce web application UI using pure HTML, CSS, and Vanilla JavaScript (NO React, NO frameworks). The UI must be fully interactive, clickable, and behave like a real production-ready application.
+
+----------------------------------------
+
+🎯 BRAND & VISUAL STYLE
+
+- Stylish fashion brand UI (Zara-like premium feel)
+- Dark + Light balanced theme
+- Clean modern typography
+- Elegant spacing + grid system
+- Dummy logo (replaceable later)
+- High-end visual hierarchy
+- Advanced styling (shadows, hover effects, smooth transitions)
+
+----------------------------------------
+
+⚡ CORE RULE
+
+- Every element MUST be:
+  ✔ Clickable
+  ✔ Functional
+  ✔ Interactive
+- No static UI
+- No duplicate UI elements
+
+----------------------------------------
+
+📱 MOBILE FIRST (PRIMARY)
+
+🔹 Top Bar:
+- Left: MEN'S HUB logo
+- Right:
+  - Search icon → opens search overlay
+  - Profile → login/profile
+  - Cart → cart page
+
+----------------------------------------
+
+🔹 Shop By Category (Grid):
+- Shirt
+- T-Shirt
+- Jean Pant
+- Slides
+- Men's Shoes
+- Sunglass
+
+✔ Click → category product listing page
+
+----------------------------------------
+
+🔹 Featured Products:
+- 2-column grid (mobile)
+- Product card:
+  - Image
+  - Name
+  - Price
+  - Add to Cart
+  - Wishlist toggle
+
+✔ Click → Product Detail Page (FULL PAGE)
+
+----------------------------------------
+
+🔹 Running Banner:
+- Scrolling marquee:
+  - Offers
+  - Flash Sale
+  - WhatsApp number
+
+----------------------------------------
+
+🔹 Customer Care Section:
+- Address (with map preview UI)
+- Phone number
+- Instagram & Facebook links
+- About Us (clickable)
+
+----------------------------------------
+
+🔹 Bottom Navigation (ALWAYS FIXED):
+- Home
+- Products
+- Categories
+- Wishlist
+
+✔ Active state highlight
+
+----------------------------------------
+
+💻 DESKTOP VIEW
+
+- Same features (NO mismatch)
+- Expanded layout:
+  - Full navbar with search bar
+  - 4-column product grid
+  - Horizontal categories
+
+----------------------------------------
+
+🔍 SEARCH SYSTEM
+
+- Click search → open overlay input
+- Typing → live suggestions (JS-based)
+- On search:
+  ✔ Navigate to product listing section/page
+  ✔ Show actual products (filter using JS)
+
+✔ Empty state:
+- Show "No products found"
+
+✔ Clear filters button required
+
+----------------------------------------
+
+📄 PRODUCT DETAIL PAGE
+
+- Image gallery (multiple images)
+- Swipe (mobile JS touch events)
+- Hover zoom (desktop CSS + JS)
+- Placeholder image if missing
+
+- Product info:
+  - Name
+  - Price
+  - Size selection (S, M, L, XL)
+
+✔ Add to Cart (JS logic)
+✔ Wishlist (JS toggle)
+
+----------------------------------------
+
+🛒 CART PAGE
+
+- Product list (render via JS)
+- Separate items for different sizes
+- Quantity increase / decrease (JS)
+- Remove item
+- Stock limit simulation
+
+✔ Total price auto-calculated (JS)
+
+----------------------------------------
+
+💳 CHECKOUT FLOW
+
+Step-based UI (JS controlled):
+
+1. Address Form:
+   - Name
+   - Phone
+   - Address
+   - City
+   - Pincode
+
+2. Payment UI (Mock only)
+
+✔ On Place Order:
+- Show success page
+- Then redirect to last visited page (JS navigation)
+
+----------------------------------------
+
+🔍 FILTER & SORT
+
+✔ Filters (JS logic):
+- Price range
+- Category
+- Size
+
+✔ Sorting:
+- Price Low → High
+- Price High → Low
+- Popular
+
+✔ Clear All Filters button
+
+✔ Sticky filter bar
+
+----------------------------------------
+
+📄 PRODUCT LISTING PAGE
+
+✔ Infinite scroll (JS implementation)
+
+----------------------------------------
+
+❤️ WISHLIST
+
+- Login mandatory
+- Heart toggle animation
+- Wishlist page:
+  ✔ Add to Cart
+
+----------------------------------------
+
+🔐 LOGIN SYSTEM
+
+- Login page/modal:
+  - Email / Username
+  - Password
+  - Google login button (mock UI)
+
+✔ Error handling (invalid login message)
+
+✔ Admin login:
+  - Username: Dharshan
+  - Password: 12345
+  → Redirect to Admin Panel
+
+✔ User login:
+  → Redirect to Home
+
+✔ Guest user:
+- Browsing allowed
+- Add to Cart / Wishlist / Checkout → requires login
+
+----------------------------------------
+
+📦 ORDER HISTORY
+
+- Show orders (JS stored data)
+- Status:
+  - Placed
+  - Shipped
+  - Delivered
+
+✔ Click → Order detail view
+
+----------------------------------------
+
+🛠️ ADMIN PANEL (JS-BASED UI)
+
+Admin can manage:
+
+1. Categories:
+   - Add / Edit / Delete
+   - Image upload
+
+2. Products:
+   - Add / Edit / Delete
+   - Multiple image upload
+   - Name, Price, Description
+
+3. Featured Products:
+   - Control visibility
+
+4. Search Data:
+   - Dynamic filtering
+
+5. Admin Tools:
+   ✔ Product search/filter
+   ✔ Preview mode (toggle user view)
+
+✔ Changes reflect instantly (DOM updates via JS)
+
+----------------------------------------
+
+🔔 NOTIFICATIONS
+
+- Toast:
+  ✔ "Item added to cart"
+  ✔ Position: Top Right
+
+- Popup:
+  ✔ "Order placed successfully"
+
+----------------------------------------
+
+🎬 ANIMATIONS
+
+- Smooth page transitions
+- Button hover effects
+- Card hover lift
+- Banner swipe (JS)
+- Product swipe
+- Smooth scrolling
+- Skeleton loading
+
+----------------------------------------
+
+📱 MOBILE UX RULES
+
+- Bottom nav always visible
+- Swipe gestures enabled
+- No duplicate UI
+
+----------------------------------------
+
+🎨 UI SYSTEM
+
+- Reusable CSS classes
+- Clean spacing system
+- Consistent colors
+
+✔ Optional:
+- Dark mode toggle (CSS + JS)
+
+----------------------------------------
+
+⚙️ TECH REQUIREMENT (STRICT)
+
+- Only:
+  ✔ HTML
+  ✔ CSS
+  ✔ Vanilla JavaScript
+
+🚫 No React
+🚫 No frameworks
+🚫 No external UI libraries
+
+----------------------------------------
+
+🚫 REMOVE
+
+- No AI Picks
+- No women's products
+- No ratings/reviews
+- No discount UI
+
+----------------------------------------
+
+🎯 FINAL OUTPUT
+
+- Fully interactive UI:
+  - Home
+  - Category
+  - Product Detail
+  - Search Results
+  - Cart
+  - Checkout
+  - Login
+  - Wishlist
+  - Order History
+  - Admin Panel
+
+- Mobile + Desktop
+- Fully clickable experience
+- Production-level design
