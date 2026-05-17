@@ -1,0 +1,10 @@
+api/
+manage.py
+requirements.txt
+backend_project/
+*.py
+venv/
+.venv/
+menshum_productpics/
+docs/
+*.md
