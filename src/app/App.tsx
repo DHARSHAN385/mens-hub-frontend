@@ -1615,7 +1615,9 @@ function LoginPage({ onLogin, onBack }: any) {
       </div>
 
       {/* Google OAuth Login */}
-      <GoogleOAuthLoginButton onSuccess={handleAuthSuccess} onError={() => {}} />
+      {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+        <GoogleOAuthLoginButton onSuccess={handleAuthSuccess} onError={() => {}} />
+      )}
     </div>
   );
 }
