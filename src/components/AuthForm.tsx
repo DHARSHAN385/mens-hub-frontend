@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Mail, Lock, User, Phone, Eye, EyeOff } from 'lucide-react';
-import { toast } from 'sonner';
+
+const toast = {
+  success: (msg: string) => console.log(msg),
+  error: (msg: string) => console.error(msg)
+};
 
 interface AuthFormProps {
   mode: 'login' | 'register';
