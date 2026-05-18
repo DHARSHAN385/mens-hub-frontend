@@ -98,9 +98,7 @@ else:
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='3306'),
             'OPTIONS': {
-                'ssl': {
-                    'ca': '/etc/ssl/certs/ca-certificates.crt' if os.path.exists('/etc/ssl/certs/ca-certificates.crt') else None
-                }
+                'ssl_mode': 'REQUIRED',
             }
         }
     }
