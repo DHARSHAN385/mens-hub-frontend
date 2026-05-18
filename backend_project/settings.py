@@ -59,7 +59,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'backend_project.urls'
-
+  
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -94,9 +94,14 @@ else:
             'ENGINE': DB_ENGINE,
             'NAME': config('DB_NAME', default='mens_hub_db'),
             'USER': config('DB_USER', default='root'),
-            'PASSWORD': config('DB_PASSWORD', default='1127'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='3306'),
+            'OPTIONS': {
+                'ssl': {
+                    'ca': '/etc/ssl/certs/ca-certificates.crt' if os.path.exists('/etc/ssl/certs/ca-certificates.crt') else None
+                }
+            }
         }
     }
 
