@@ -4,7 +4,6 @@ describe('Men\'s Hub Comprehensive E2E Test', () => {
     cy.visit('http://localhost:5173/');
     cy.clearLocalStorage();
   });
-
   it('should navigate through the entire store, add items to cart, and place an order', () => {
     // 1. Homepage Verification
     cy.contains(/Men's Hub/i).should('be.visible');

@@ -53,13 +53,15 @@ export const uploadImage = async (file: File): Promise<string> => {
   try {
     const formData = new FormData();
     formData.append('image', file);
-    
+
     // Get auth token
     const authToken = localStorage.getItem('authToken');
     if (!authToken) {
+      alert('You must be logged in as admin to upload images. Redirecting to login...');
+      window.location.href = '/admin-login';
       throw new Error('Not authenticated');
     }
-    
+
     const response = await fetch(`${BACKEND_URL}/api/admin/upload-image/`, {
       method: 'POST',
       headers: {
@@ -67,12 +69,14 @@ export const uploadImage = async (file: File): Promise<string> => {
       },
       body: formData,
     });
-    
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to upload image');
+      let error = {};
+      try { error = await response.json(); } catch {}
+      alert(error['error'] || 'Failed to upload image. You may not be authenticated.');
+      throw new Error(error['error'] || 'Failed to upload image');
     }
-    
+
     const data = await response.json();
     console.log('✅ Image uploaded successfully:', data.image_url);
     clearCache(); // Invalidate cache after upload/change
@@ -114,14 +118,20 @@ export interface AdminCategory {
  */
 export const saveProduct = async (product: any): Promise<any> => {
   try {
+    // Require authentication
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+      alert('You must be logged in as admin to save products. Redirecting to login...');
+      window.location.href = '/admin-login';
+      throw new Error('Not authenticated');
+    }
+
     let image = product.images?.[0] || product.image_url || '';
-    
     // Don't send base64 images (too large), only send URLs
     if (image && image.startsWith('data:image/')) {
       console.warn('⚠ Skipping base64 image (too large), saving without image');
       image = '';
     }
-    
     const backendProduct: AdminProduct & { images?: string[] } = {
       name: product.name,
       description: product.description || product.name, 
@@ -142,7 +152,6 @@ export const saveProduct = async (product: any): Promise<any> => {
         const response = await apiCall(`/api/products/${product.id}/`, 'PUT', backendProduct);
         console.log('✅ Product PERMANENTLY updated in DB:', response);
         clearCache();
-        // Defensive: ensure response is a valid product object
         if (response && typeof response === 'object' && response.id && response.name) {
           return response;
         } else {
@@ -153,9 +162,7 @@ export const saveProduct = async (product: any): Promise<any> => {
         console.error('❌ Failed to update product in database:', error);
         throw new Error(`Failed to update product: ${error.message}`);
       }
-    }
-    // Create new product (ID will be assigned by backend)
-    else {
+    } else {
       try {
         const response = await apiCall('/api/products/', 'POST', backendProduct);
         console.log('✅ Product PERMANENTLY created in DB:', response);
@@ -203,14 +210,18 @@ export const deleteProductFromDB = async (id: any): Promise<void> => {
  */
 export const saveCategory = async (category: any): Promise<any> => {
   try {
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+      alert('You must be logged in as admin to save categories. Redirecting to login...');
+      window.location.href = '/admin-login';
+      throw new Error('Not authenticated');
+    }
+
     let image = category.img || '';
-    
-    // Don't send base64 images (too large), only send URLs
     if (image && image.startsWith('data:image/')) {
       console.warn('⚠ Skipping base64 image (too large), saving without image');
       image = '';
     }
-    
     const backendCategory: AdminCategory = {
       name: category.name,
       img: image, // Only URL, no base64
@@ -271,6 +282,7 @@ export const deleteCategoryFromDB = async (id: any): Promise<void> => {
  * Load all products from database
  * ⚡ ALWAYS loads FRESH data from DATABASE
  */
+
 export const loadProductsFromDB = async (forceRefresh = false): Promise<any[]> => {
   try {
     const now = Date.now();
@@ -278,54 +290,28 @@ export const loadProductsFromDB = async (forceRefresh = false): Promise<any[]> =
       console.log('⚡ Serving products from cache');
       return productsCache;
     }
-
     console.log('📦 Loading products from database...');
     const products = await apiCall('/api/products/', 'GET');
-    
-    // Handle null response (server issue)
     if (!products) {
       console.warn('⚠ API returned null for products');
       return [];
     }
-    
     // Handle response that might be paginated
     const data = products.results || products;
     if (!Array.isArray(data)) {
       console.warn('⚠ API returned non-array response:', products);
       return [];
     }
-    
-    // Transform backend format to frontend format
-    const transformed = data.map((p: any) => {
-      const primaryImage = processImageUrl(p.image_url);
-      let galleryImages = [];
-      
-      if (Array.isArray(p.images) && p.images.length > 0) {
-        galleryImages = p.images.map((img: string) => processImageUrl(img)).filter(Boolean);
-      } else {
-        galleryImages = primaryImage ? [primaryImage] : [];
-      }
-
-      return {
-        id: p.id,
-        name: p.name,
-        price: Number(p.price),
-        category: p.category,
-        popularity: p.popularity || 0,
-        sizes: p.sizes || [],
-        featured: p.featured || false,
-        image_url: primaryImage,
-        images: galleryImages,
-      };
-    });
-    
+    // Transform backend format to frontend format if needed
+    const transformed = data.map((p: any) => ({
+      ...p
+    }));
     console.log(`✅ Successfully loaded ${transformed.length} products from DATABASE`);
     productsCache = transformed;
-    lastFetchTime = Date.now();
+    lastFetchTime = now;
     return transformed;
-    
   } catch (error) {
-    console.error('❌ Failed to load products:', error);
+    console.error('❌ Error loading products:', error);
     return [];
   }
 };
@@ -334,6 +320,7 @@ export const loadProductsFromDB = async (forceRefresh = false): Promise<any[]> =
  * Load all categories from database
  * ⚡ ALWAYS loads FRESH data from DATABASE
  */
+// Duplicate removed
 export const loadCategoriesFromDB = async (forceRefresh = false): Promise<any[]> => {
   try {
     if (!forceRefresh && categoriesCache) {
@@ -341,31 +328,26 @@ export const loadCategoriesFromDB = async (forceRefresh = false): Promise<any[]>
     }
     console.log('📂 Loading categories from database...');
     const categories = await apiCall('/api/categories/', 'GET');
-    
     // Handle null response (server issue)
     if (!categories) {
       console.warn('⚠ API returned null for categories');
       return [];
     }
-    
     // Handle response that might be paginated
     const data = categories.results || categories;
     if (!Array.isArray(data)) {
       console.warn('⚠ API returned non-array response:', categories);
       return [];
     }
-    
     // Transform backend format to frontend format
     const transformed = data.map((c: any) => ({
       id: c.id,
       name: c.name,
       img: c.img || '',
     }));
-    
     console.log(`✅ Successfully loaded ${transformed.length} categories from DATABASE`);
     categoriesCache = transformed;
     return transformed;
-    
   } catch (error) {
     console.error('❌ Failed to load categories:', error);
     return [];
@@ -401,9 +383,9 @@ export const loadBannerFromSettings = async (forceRefresh = false): Promise<stri
     console.log('🖼️ Loading banner from database...');
     const response = await apiCall('/api/settings/banner/', 'GET');
     const bannerUrl = response?.banner_url || '';
-    console.log('✅ Banner loaded from DATABASE:', bannerUrl);
-    bannerCache = bannerUrl;
-    return bannerUrl;
+    const processedBannerUrl = processImageUrl(bannerUrl);
+    bannerCache = processedBannerUrl;
+    return processedBannerUrl;
   } catch (error: any) {
     console.error('⚠️ Failed to load banner (will use empty):', error);
     return '';
@@ -460,4 +442,5 @@ export default {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   clearCache,
+  uploadImage,
 };

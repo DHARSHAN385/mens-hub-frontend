@@ -1,6 +1,6 @@
 # pyright: reportMissingImports=false
 from rest_framework import serializers
-from .models import Product, Order, Category, Cart, Wishlist, Banner, GoogleUser, OrderNotification, Address, UserProfile, ExchangeRequest
+from .models import Product, Order, Category, Cart, Wishlist, Banner, GoogleUser, OrderNotification, Address, UserProfile, ExchangeRequest, AdminContact
 from django.contrib.auth.models import User
 
 
@@ -37,7 +37,7 @@ class OrderNotificationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = OrderNotification
-        fields = ['id', 'order_number', 'customer_name', 'customer_email', 'phone', 'city', 'total_amount', 'items_count', 'items_summary', 'is_read', 'created_at', 'read_at', 'order_status']
+        fields = ['id', 'order_number', 'customer_name', 'customer_email', 'phone', 'city', 'address', 'pincode', 'total_amount', 'items_count', 'items_summary', 'is_read', 'created_at', 'read_at', 'order_status']
         read_only_fields = ['created_at', 'read_at']
 
 
@@ -46,30 +46,36 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'name', 'img', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
-    
+
+    def _ensure_media_path(self, value):
+        if value and not value.startswith(('http://', 'https://', '/media/', 'data:image/')):
+            return f"/media/{value}"
+        return value
+
+    def create(self, validated_data):
+        if 'img' in validated_data:
+            validated_data['img'] = self._ensure_media_path(validated_data['img'])
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'img' in validated_data:
+            validated_data['img'] = self._ensure_media_path(validated_data['img'])
+        return super().update(instance, validated_data)
+
     def validate_img(self, value):
-        """Validate that img is either a valid URL or data URL (base64)."""
         if not value:
             return value
-        
-        # Accept data URLs (base64 encoded images)
         if value.startswith('data:image/'):
             return value
-        
-        # Accept regular URLs
         if value.startswith('http://') or value.startswith('https://') or value.startswith('/'):
             return value
-        
-        # If it's something else, still accept it (might be a relative path)
         return value
-    
+
     def get_placeholder_image_url(self, name: str) -> str:
-        """Generate a placeholder image URL based on category name"""
-        # Map category names to colors
         name_lower = name.lower()
         category_colors = {
             'shirt': '#ff6b6b',
-            'pants': '#4ecdc4', 
+            'pants': '#4ecdc4',
             'jacket': '#95a5a6',
             'shoes': '#f9ca24',
             'accessories': '#6c5ce7',
@@ -79,35 +85,45 @@ class CategorySerializer(serializers.ModelSerializer):
             'sunglass': '#74b9ff',
             'sarees': '#fd79a8',
         }
-        
         color = category_colors.get(name_lower, '#95a5a6')
         placeholder_svg = f'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="{color.replace("#", "%23")}" width="400" height="400"/%3E%3Ctext x="50%25" y="50%25" font-size="32" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="Arial"%3E{name}%3C/text%3E%3C/svg%3E'
         return placeholder_svg
-    
-    def to_representation(self, instance):
-        return super().to_representation(instance)
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
     class Meta:
         model = Product
-        fields = ['id', 'name', 'description', 'price', 'category', 'image_url', 'images', 'stock', 'sizes', 'popularity', 'featured', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'price', 'category', 'category_name', 'image_url', 'images', 'stock', 'sizes', 'popularity', 'featured', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
-    
+
+    def _ensure_media_path(self, value):
+        if value and not value.startswith(('http://', 'https://', '/media/', 'data:image/')):
+            return f"/media/{value}"
+        return value
+
+    def create(self, validated_data):
+        if 'image_url' in validated_data:
+            validated_data['image_url'] = self._ensure_media_path(validated_data['image_url'])
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'image_url' in validated_data:
+            validated_data['image_url'] = self._ensure_media_path(validated_data['image_url'])
+        return super().update(instance, validated_data)
+
     def validate_image_url(self, value):
-        """Validate that image_url is either a valid URL or data URL (base64)."""
         if not value:
             return value
         if value.startswith('data:image/') or value.startswith('http') or value.startswith('/'):
             return value
         return value
-    
+
     def get_placeholder_image_url(self, category: str) -> str:
-        """Generate a placeholder image URL based on category"""
-        # Map categories to placeholder image colors
         category_colors = {
             'shirt': '#ff6b6b',
-            'pants': '#4ecdc4', 
+            'pants': '#4ecdc4',
             'jacket': '#95a5a6',
             'shoes': '#f9ca24',
             'accessories': '#6c5ce7',
@@ -117,20 +133,15 @@ class ProductSerializer(serializers.ModelSerializer):
             'sunglass': '#74b9ff',
             'sarees': '#fd79a8',
         }
-        
         color = category_colors.get(category, '#95a5a6')
-        # Return a simple SVG-based placeholder URL
         placeholder_svg = f'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="600" height="800"%3E%3Crect fill="{color.replace("#", "%23")}" width="600" height="800"/%3E%3Ctext x="50%25" y="50%25" font-size="48" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="Arial"%3EProduct%3C/text%3E%3C/svg%3E'
         return placeholder_svg
-    
-    def to_representation(self, instance):
-        return super().to_representation(instance)
 
 
 class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
-        fields = ['id', 'user', 'order_number', 'customer_name', 'customer_email', 'phone', 'city', 'total_amount', 'address', 'pincode', 'status', 'items', 'tracking_number', 'payment_id', 'payment_method', 'payment_status', 'is_delivered', 'delivered_at', 'exchange_eligible_until', 'exchange_status', 'created_at', 'updated_at']
+        fields = ['id', 'user', 'order_number', 'customer_name', 'customer_email', 'phone', 'city', 'total_amount', 'address', 'pincode', 'status', 'items', 'tracking_number', 'payment_id', 'payment_method', 'payment_status', 'is_delivered', 'shipped_at', 'delivered_at', 'exchange_eligible_until', 'exchange_status', 'created_at', 'updated_at']
         read_only_fields = ['user', 'created_at', 'updated_at', 'order_number']
 
     def to_representation(self, instance):
@@ -186,15 +197,25 @@ class BannerSerializer(serializers.ModelSerializer):
         model = Banner
         fields = ['id', 'image_url', 'title', 'description', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
-    
+
+    def _ensure_media_path(self, value):
+        if value and not value.startswith(('http://', 'https://', '/media/', 'data:image/')):
+            return f"/media/{value}"
+        return value
+
+    def create(self, validated_data):
+        if 'image_url' in validated_data:
+            validated_data['image_url'] = self._ensure_media_path(validated_data['image_url'])
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'image_url' in validated_data:
+            validated_data['image_url'] = self._ensure_media_path(validated_data['image_url'])
+        return super().update(instance, validated_data)
+
     def get_placeholder_banner_url(self, title: str = "Banner") -> str:
-        """Generate a placeholder banner image URL"""
-        # Create a nice banner placeholder
         placeholder_svg = f'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="400"%3E%3Crect fill="%236c5ce7" width="1200" height="400"/%3E%3Ctext x="50%25" y="50%25" font-size="56" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-weight="bold"%3E{title}%3C/text%3E%3C/svg%3E'
         return placeholder_svg
-    
-    def to_representation(self, instance):
-        return super().to_representation(instance)
 
 
 class AddressSerializer(serializers.ModelSerializer):
@@ -214,3 +235,11 @@ class ExchangeRequestSerializer(serializers.ModelSerializer):
         model = ExchangeRequest
         fields = ['id', 'order', 'order_number', 'customer_name', 'customer_email', 'product_id', 'product_name', 'size_old', 'size_new', 'reason', 'reason_description', 'status', 'admin_comment', 'return_label_url', 'replacement_tracking', 'requested_at', 'approved_at', 'return_received_at', 'replacement_shipped_at', 'completed_at', 'updated_at']
         read_only_fields = ['requested_at', 'approved_at', 'return_received_at', 'replacement_shipped_at', 'completed_at', 'updated_at']
+
+
+class AdminContactSerializer(serializers.ModelSerializer):
+    """Serializer for Admin Contact Information."""
+    class Meta:
+        model = AdminContact
+        fields = ['id', 'admin_name', 'whatsapp_number', 'email', 'phone', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']

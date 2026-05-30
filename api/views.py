@@ -1,61 +1,61 @@
-from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
-from rest_framework.request import Request
 from rest_framework.permissions import IsAuthenticated, BasePermission
-from .models import Product, Order, Category, Cart, Wishlist, Banner, GoogleUser, OrderNotification, Address, UserProfile, ExchangeRequest
+from .models import Product, Order, Category, Cart, Wishlist, Banner, GoogleUser, OrderNotification, Address, UserProfile, ExchangeRequest, AdminContact
 from .serializers import (
     ProductSerializer, OrderSerializer, CategorySerializer, 
-    CartSerializer, WishlistSerializer, BannerSerializer, UserSerializer, GoogleUserSerializer,
-    OrderNotificationSerializer, AddressSerializer
+    CartSerializer, WishlistSerializer, BannerSerializer,
+    OrderNotificationSerializer, AddressSerializer, AdminContactSerializer
 )
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from django.conf import settings
-import json
-from typing import Optional, Any
+from typing import Any
 from django.utils import timezone
 from api.services import create_order_notification  # Import notification service
-import hashlib
-import hmac
 from datetime import datetime, timedelta
 
 
 # Permission Classes
 class IsAdminUser(BasePermission):
     """Permission class to check if user is an admin."""
-    def has_permission(self, request, view):
+    def has_permission(self, request, view):  # type: ignore[override]
+        """Return True if the authenticated user has admin flag in profile."""
         if not request.user or not request.user.is_authenticated:
             return False
         try:
             profile = UserProfile.objects.get(user=request.user)
-            return profile.is_admin
+            return bool(profile.is_admin)
         except UserProfile.DoesNotExist:
             return False
 
 
 class IsAdminOrReadOnly(BasePermission):
     """Permission class to allow read-only access to all users, write access to admins only."""
-    def has_permission(self, request, view):
+    def has_permission(self, request, view):  # type: ignore[override]
+        """Allow read-only for everyone, write for admins or staff.
+
+        Returns True for safe methods, otherwise checks authentication and admin status.
+        """
         # Allow read-only access to everyone
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
-        
+
         # For write operations, check if user is authenticated
         if not request.user or not request.user.is_authenticated:
             return False
-        
+
         # Check if user is staff/superuser
         if request.user.is_staff or request.user.is_superuser:
             return True
-        
+
         # Check UserProfile.is_admin flag
         try:
             profile = UserProfile.objects.get(user=request.user)
-            return profile.is_admin
+            return bool(profile.is_admin)
         except UserProfile.DoesNotExist:
             # If no profile exists, check if user email matches admin emails
             admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com']
@@ -95,7 +95,11 @@ class ProductViewSet(viewsets.ModelViewSet):
         featured = self.request.query_params.get('featured')  # type: ignore
         
         if category:
-            queryset = queryset.filter(category=category)
+            if category.isdigit():
+                queryset = queryset.filter(category_id=int(category))
+            else:
+                from django.db.models import Q
+                queryset = queryset.filter(Q(category__name__iexact=category) | Q(category_temp__iexact=category))
         if featured == 'true':
             queryset = queryset.filter(featured=True)
             
@@ -196,36 +200,15 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         print(f"DEBUG: Order saved with ID {order.id}, Name: {order.customer_name}")
         
-        # Create notification for admin
-        try:
-            # Defensive check for items
-            items_list = []
-            if order.items:
-                if isinstance(order.items, list):
-                    items_list = order.items
-                elif isinstance(order.items, str):
-                    try:
-                        import json
-                        items_list = json.loads(order.items)
-                    except:
-                        items_list = []
-
-            OrderNotification.objects.create(
-                order=order,
-                customer_name=order.customer_name,
-                customer_email=order.customer_email,
-                phone=order.phone,
-                city=order.city,
-                total_amount=order.total_amount,
-                items_count=len(items_list) if isinstance(items_list, list) else 0,
-                items_summary=items_list if isinstance(items_list, list) else [],
-                is_read=False
-            )
-            print(f"DEBUG: Notification created for order {order.order_number}")
-        except Exception as e:
-            print(f"DEBUG: Notification error: {str(e)}")
-            import traceback
-            traceback.print_exc()
+        # Create notification for admin and trigger WebSocket event only if order is already paid/success
+        if order.payment_status == 'success':
+            try:
+                create_order_notification(order)
+                print(f"DEBUG: Notification triggered successfully for paid order {order.order_number}")
+            except Exception as e:
+                print(f"DEBUG: Notification error: {str(e)}")
+                import traceback
+                traceback.print_exc()
     
     @action(detail=True, methods=['patch'])
     def update_status(self, request, pk=None):
@@ -294,6 +277,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     def initiate_payment(self, request):
         """Initiate Cashfree payment session."""
         try:
+            import requests as py_requests
+            
             # Get Cashfree credentials from settings
             cashfree_app_id = getattr(settings, 'CASHFREE_APP_ID', None)
             cashfree_secret = getattr(settings, 'CASHFREE_SECRET_KEY', None)
@@ -317,37 +302,70 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Generate Cashfree session
+            # Create random customer_id if not authenticated or missing
+            cust_id = f"cust_{request.user.id}" if request.user and request.user.is_authenticated else f"cust_guest_{order_id}"
+            
+            # Use real Cashfree PG API endpoint
             cashfree_url = "https://sandbox.cashfree.com/pg/orders" if cashfree_mode == 'TEST' else "https://api.cashfree.com/pg/orders"
+            
+            headers = {
+                "x-client-id": cashfree_app_id,
+                "x-client-secret": cashfree_secret,
+                "x-api-version": "2023-08-01",
+                "Content-Type": "application/json"
+            }
+            
+            # Check phone and email are not empty or invalid (Cashfree requirements)
+            valid_phone = customer_phone if customer_phone and len(customer_phone) >= 10 else "9999999999"
+            valid_email = customer_email if customer_email else "customer@menshub.com"
             
             session_data = {
                 'order_id': str(order_id),
                 'order_amount': amount,
                 'order_currency': 'INR',
                 'customer_details': {
+                    'customer_id': cust_id,
                     'customer_name': customer_name,
-                    'customer_email': customer_email,
-                    'customer_phone': customer_phone
+                    'customer_email': valid_email,
+                    'customer_phone': valid_phone
                 },
                 'order_meta': {
-                    'return_url': f"{settings.FRONTEND_URL}/orders?payment=success&order={order_id}",
-                    'notify_url': f"{settings.BACKEND_URL}/api/orders/verify-payment/"
+                    'return_url': f"{settings.FRONTEND_URL}/orders?payment=success&order_id={order_id}"
                 }
             }
             
-            # Log payment initiation
-            print(f"✅ Payment initiated: Order {order_id} - ₹{amount}")
+            # Make the API call to Cashfree to generate a real session
+            response = py_requests.post(cashfree_url, json=session_data, headers=headers, timeout=10)
+            
+            if response.status_code not in [200, 201]:
+                print(f"❌ Cashfree response error ({response.status_code}): {response.text}")
+                return Response(
+                    {'error': f"Cashfree API Error: {response.text}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            res_json = response.json()
+            payment_session_id = res_json.get('payment_session_id')
+            cf_order_id = res_json.get('order_id')
+            
+            if not payment_session_id:
+                print(f"❌ Cashfree did not return payment_session_id: {res_json}")
+                return Response(
+                    {'error': 'Cashfree payment session creation failed'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            print(f"✅ Real Cashfree Payment Session Created: Order {cf_order_id} - ₹{amount}")
             
             return Response({
                 'status': 'success',
-                'cashfree_url': cashfree_url,
-                'session_data': session_data,
-                'order_id': order_id,
+                'payment_session_id': payment_session_id,
+                'order_id': cf_order_id,
                 'amount': amount,
                 'mode': cashfree_mode,
-                'message': f'Payment session created. Redirecting to Cashfree...'
+                'message': 'Payment session created. Launching Cashfree checkout...'
             }, status=status.HTTP_200_OK)
-        
+            
         except Exception as e:
             print(f"❌ Payment initiation error: {str(e)}")
             return Response(
@@ -359,28 +377,93 @@ class OrderViewSet(viewsets.ModelViewSet):
     def verify_payment(self, request):
         """Verify Cashfree payment callback."""
         try:
+            import requests as py_requests
+            
             order_id = request.data.get('order_id')
-            payment_id = request.data.get('payment_id')
-            payment_status = request.data.get('order_status', '').lower()
+            payment_id = request.data.get('payment_id') # Might be empty on check init
             
             if not order_id:
                 return Response({'error': 'order_id required'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Get Cashfree credentials from settings
+            cashfree_app_id = getattr(settings, 'CASHFREE_APP_ID', None)
+            cashfree_secret = getattr(settings, 'CASHFREE_SECRET_KEY', None)
+            cashfree_mode = getattr(settings, 'CASHFREE_MODE', 'TEST')
+            
+            if not cashfree_app_id or not cashfree_secret:
+                return Response(
+                    {'error': 'Cashfree credentials not configured'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+            # Query Cashfree API directly for security check
+            base_url = "https://sandbox.cashfree.com/pg/orders" if cashfree_mode == 'TEST' else "https://api.cashfree.com/pg/orders"
+            verify_url = f"{base_url}/{order_id}"
+            
+            headers = {
+                "x-client-id": cashfree_app_id,
+                "x-client-secret": cashfree_secret,
+                "x-api-version": "2023-08-01"
+            }
+            
+            response = py_requests.get(verify_url, headers=headers, timeout=10)
+            
+            if response.status_code != 200:
+                print(f"❌ Cashfree verification API failed ({response.status_code}): {response.text}")
+                return Response(
+                    {'error': f"Cashfree Verification Error: {response.text}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            res_json = response.json()
+            cashfree_status = res_json.get('order_status', '').upper()
+            
+            # Fetch payments details to find the transaction ID
+            payments_url = f"{base_url}/{order_id}/payments"
+            payments_response = py_requests.get(payments_url, headers=headers, timeout=10)
+            txn_id = payment_id
+            pay_method = 'upi'
+            if payments_response.status_code == 200:
+                payments_list = payments_response.json()
+                if isinstance(payments_list, list) and len(payments_list) > 0:
+                    latest_payment = payments_list[0]
+                    txn_id = latest_payment.get('cf_payment_id', payment_id)
+                    pay_method = latest_payment.get('payment_group', 'upi')
             
             # Update order with payment info
             try:
                 order = Order.objects.get(order_number=order_id)
-                order.payment_id = payment_id
-                order.payment_status = 'success' if payment_status == 'paid' else 'failed'
-                order.payment_method = request.data.get('payment_method', 'upi')
-                order.status = 'processing' if payment_status == 'paid' else 'cancelled'
-                order.save()
+                order.payment_id = txn_id
                 
-                print(f"✅ Payment verified: Order {order_id} - Status: {order.payment_status}")
+                if cashfree_status == 'PAID':
+                    order.payment_status = 'success'
+                    order.payment_method = pay_method
+                    order.status = 'processing'
+                    order.save()
+                    
+                    # Create notification for admin now that order is paid
+                    try:
+                        create_order_notification(order)
+                        print(f"DEBUG: Notification triggered successfully for verified paid order {order_id}")
+                    except Exception as e:
+                        print(f"DEBUG: Notification error: {str(e)}")
+                elif cashfree_status in ['FAILED', 'CANCELLED']:
+                    order.payment_status = 'failed'
+                    order.status = 'cancelled'
+                    order.save()
+                else:
+                    order.payment_status = 'pending'
+                    order.status = 'pending'
+                    order.save()
+                
+                print(f"✅ Real Payment verified: Order {order_id} - Cashfree Status: {cashfree_status} -> DB Status: {order.payment_status}")
                 
                 serializer = self.get_serializer(order)
                 return Response({
                     'status': 'success',
-                    'message': f'Payment {order.payment_status}',
+                    'cashfree_status': cashfree_status,
+                    'payment_status': order.payment_status,
+                    'message': f'Payment is {order.payment_status}',
                     'order': serializer.data
                 }, status=status.HTTP_200_OK)
             
@@ -777,24 +860,24 @@ class BannerViewSet(viewsets.ModelViewSet):
 
 class OrderNotificationViewSet(viewsets.ModelViewSet):
     """ViewSet for Order Notifications - Admin only."""
-    queryset = OrderNotification.objects.all()
+    queryset = OrderNotification.objects.all().distinct()
     serializer_class = OrderNotificationSerializer
     
     def get_queryset(self) -> Any:
         """Return all notifications ordered by creation date."""
-        return OrderNotification.objects.all().order_by('-created_at')
+        return OrderNotification.objects.all().distinct().order_by('-created_at')
     
     @action(detail=False, methods=['get'])
     def unread(self, request):
         """Get all unread notifications."""
-        unread_notifications = OrderNotification.objects.filter(is_read=False).order_by('-created_at')
+        unread_notifications = OrderNotification.objects.filter(is_read=False).distinct().order_by('-created_at')
         serializer = self.get_serializer(unread_notifications, many=True)
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
     def count(self, request):
         """Get count of unread notifications."""
-        count = OrderNotification.objects.filter(is_read=False).count()
+        count = OrderNotification.objects.filter(is_read=False).distinct().count()
         return Response({'unread_count': count})
     
     @action(detail=True, methods=['post'])
@@ -807,6 +890,13 @@ class OrderNotificationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(notification)
         return Response(serializer.data)
     
+    @action(detail=True, methods=['post'])
+    def dismiss(self, request, pk=None):
+        """Dismiss/delete a notification."""
+        notification = self.get_object()
+        notification.delete()
+        return Response({'status': 'notification dismissed', 'id': pk}, status=status.HTTP_204_NO_CONTENT)
+    
     @action(detail=False, methods=['post'])
     def mark_all_as_read(self, request):
         """Mark all notifications as read."""
@@ -815,6 +905,26 @@ class OrderNotificationViewSet(viewsets.ModelViewSet):
             read_at=timezone.now()
         )
         return Response({'marked_as_read': unread_count})
+    
+    @action(detail=False, methods=['post'])
+    def cleanup(self, request):
+        """Clean up old duplicate notifications (keep only the latest for each order)."""
+        from django.db.models import Max
+        
+        # Get latest notification ID for each order
+        latest_notifications = OrderNotification.objects.values('order_id').annotate(
+            latest_id=Max('id')
+        )
+        latest_ids = [item['latest_id'] for item in latest_notifications]
+        
+        # Delete all notifications except the latest ones
+        deleted_count, _ = OrderNotification.objects.exclude(id__in=latest_ids).delete()
+        
+        return Response({
+            'status': 'cleanup completed',
+            'deleted_count': deleted_count,
+            'remaining_notifications': OrderNotification.objects.count()
+        })
 
 
 class AddressViewSet(viewsets.ModelViewSet):
@@ -1062,6 +1172,7 @@ def register_user(request):
             )
         
         # Validate phone number if provided
+        phone_clean = None
         if phone:
             # Remove any spaces or hyphens
             phone_clean = phone.replace(' ', '').replace('-', '').replace('+91', '')
@@ -1301,3 +1412,175 @@ def create_order_with_notification(request):
             {'error': f'Failed to create order: {str(e)}'},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+# =====================================================================
+# ADMIN CONTACT & SUPPORT ENDPOINTS
+# =====================================================================
+
+class AdminContactViewSet(viewsets.ModelViewSet):
+    """ViewSet for Admin Contact Information - Admin only."""
+    queryset = AdminContact.objects.all()
+    serializer_class = AdminContactSerializer
+    permission_classes = [IsAdminUser]
+    
+    def get_queryset(self):
+        """Get all admin contacts, filtered by active status."""
+        return AdminContact.objects.filter(is_active=True).order_by('-created_at')
+    
+    @action(detail=False, methods=['get'])
+    def get_active_contacts(self, request):
+        """Get active admin contact for support."""
+        contacts = AdminContact.objects.filter(is_active=True).order_by('-created_at')
+        serializer = self.get_serializer(contacts, many=True)
+        return Response({
+            'success': True,
+            'contacts': serializer.data,
+            'count': contacts.count()
+        }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_support_contact(request):
+    """
+    Get admin contact information for customer support.
+    
+    Returns:
+    {
+        "success": true,
+        "admin_name": "Mubarak",
+        "whatsapp_number": "+919876543210",
+        "email": "admin@menshub.com",
+        "phone": "+919876543210"
+    }
+    """
+    try:
+        # Get the active admin contact
+        contact = AdminContact.objects.filter(is_active=True).first()
+        
+        if not contact:
+            return Response({
+                'success': False,
+                'message': 'No active support contact available'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response({
+            'success': True,
+            'admin_name': contact.admin_name,
+            'whatsapp_number': contact.whatsapp_number,
+            'email': contact.email,
+            'phone': contact.phone
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': f'Failed to fetch support contact: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def support_with_order(request):
+    """
+    Get support contact with order details.
+    
+    Request body:
+    {
+        "order_id": 123,
+        "order_number": "123456"
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "message": "Support with Order #123456",
+        "admin_contact": {
+            "admin_name": "Mubarak",
+            "whatsapp_number": "+919876543210",
+            "email": "admin@menshub.com"
+        },
+        "order_details": {
+            "order_id": 123,
+            "order_number": "123456",
+            "customer_name": "John Doe",
+            "customer_email": "john@example.com",
+            "address": "123 Main St, City",
+            "pincode": "123456",
+            "phone": "9876543210",
+            "status": "pending"
+        },
+        "whatsapp_link": "https://wa.me/919876543210?text=Help%20with%20Order%23123456%20..."
+    }
+    """
+    try:
+        order_id = request.data.get('order_id')
+        order_number = request.data.get('order_number')
+        
+        if not order_id and not order_number:
+            return Response({
+                'success': False,
+                'error': 'order_id or order_number is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Fetch order
+        try:
+            if order_id:
+                order = Order.objects.get(id=order_id)
+            else:
+                order = Order.objects.get(order_number=order_number)
+        except Order.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Order not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Fetch admin contact
+        contact = AdminContact.objects.filter(is_active=True).first()
+        if not contact:
+            return Response({
+                'success': False,
+                'message': 'No active support contact available'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Prepare WhatsApp message
+        whatsapp_msg = f"Hello, I need help with Order #{order.order_number}\n"
+        whatsapp_msg += f"Customer: {order.customer_name}\n"
+        whatsapp_msg += f"Email: {order.customer_email}\n"
+        whatsapp_msg += f"Address: {order.address}\n"
+        whatsapp_msg += f"Pincode: {order.pincode}\n"
+        whatsapp_msg += f"Phone: {order.phone}\n"
+        
+        # Create WhatsApp link
+        import urllib.parse
+        whatsapp_link = f"https://wa.me/{contact.whatsapp_number.replace('+', '')}?text={urllib.parse.quote(whatsapp_msg)}"
+        
+        return Response({
+            'success': True,
+            'message': f'Support with Order #{order.order_number}',
+            'admin_contact': {
+                'admin_name': contact.admin_name,
+                'whatsapp_number': contact.whatsapp_number,
+                'email': contact.email,
+                'phone': contact.phone
+            },
+            'order_details': {
+                'order_id': order.id,
+                'order_number': order.order_number,
+                'customer_name': order.customer_name,
+                'customer_email': order.customer_email,
+                'address': order.address,
+                'pincode': order.pincode,
+                'phone': order.phone,
+                'status': order.status
+            },
+            'whatsapp_link': whatsapp_link,
+            'support_message': whatsapp_msg
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'success': False,
+            'error': f'Failed to get support contact: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

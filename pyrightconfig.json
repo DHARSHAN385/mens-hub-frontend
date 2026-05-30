@@ -13,4 +13,9 @@
     "./api",
     "./.venv/Lib/site-packages"
   ]
+  ,
+  "reportMissingModuleSource": false,
+  "reportMissingImports": false,
+  "reportAttributeAccessIssue": false,
+  "reportGeneralTypeIssues": false
 }

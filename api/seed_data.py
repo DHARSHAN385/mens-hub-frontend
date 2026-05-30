@@ -16,11 +16,25 @@ def seed_data():
     # Create Categories
     categories_data = [
         {'name': 'Shirt', 'img': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500'},
+        {'name': 'T-Shirt', 'img': 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=500'},
+        {'name': 'Jeans', 'img': 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=500'},
+        {'name': 'Slides', 'img': 'https://images.unsplash.com/photo-1519864600265-abb23847ef2c?w=500'},
+        {'name': 'Shoes', 'img': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500'},
+        {'name': 'Sunglasses', 'img': 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500'},
         {'name': 'Pants', 'img': 'https://images.unsplash.com/photo-1542272604-787c62d465d1?w=500'},
         {'name': 'Jacket', 'img': 'https://images.unsplash.com/photo-1551028719-00167b16ebc5?w=500'},
-        {'name': 'Shoes', 'img': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500'},
         {'name': 'Accessories', 'img': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=500'},
+        {'name': 'Sarees', 'img': 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=500'},
     ]
+        # Seed permanent notifications (example)
+        # from api.models import Notification
+        # notifications_data = [
+        #     {'title': 'Order Placed', 'message': 'Your order has been placed successfully!', 'is_permanent': True},
+        #     ...
+        # ]
+        # for notif in notifications_data:
+        #     Notification.objects.get_or_create(title=notif['title'], defaults=notif)
+        # print("✅ Permanent notifications created")
     
     for cat_data in categories_data:
         Category.objects.get_or_create(
@@ -196,9 +210,28 @@ def seed_data():
     ]
     
     for prod_data in products_data:
+        cat_name = prod_data.get('category')
+        cat_map = {
+            'shirt': 'Shirt',
+            'tshirt': 'T-Shirt',
+            'jeans': 'Jeans',
+            'slides': 'Slides',
+            'shoes': 'Shoes',
+            'sunglass': 'Sunglasses',
+            'pants': 'Pants',
+            'jacket': 'Jacket',
+            'accessories': 'Accessories',
+            'sarees': 'Sarees',
+        }
+        mapped_cat_name = cat_map.get(cat_name, cat_name.capitalize() if cat_name else 'Shirt')
+        category_obj, _ = Category.objects.get_or_create(name=mapped_cat_name)
+        
+        defaults_data = prod_data.copy()
+        defaults_data['category'] = category_obj
+        
         Product.objects.get_or_create(
             name=prod_data['name'],
-            defaults=prod_data
+            defaults=defaults_data
         )
     
     print("✅ Products created")

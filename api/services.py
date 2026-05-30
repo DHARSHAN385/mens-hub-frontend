@@ -16,7 +16,7 @@ def create_order_notification(order):
     Create an OrderNotification record for a new order.
     
     This function:
-    1. Creates an OrderNotification database record
+    1. Creates an OrderNotification database record with customer details
     2. Triggers WebSocket event to notify admins
     
     Args:
@@ -24,50 +24,86 @@ def create_order_notification(order):
         
     Returns:
         OrderNotification: The created notification object
-        
-    Example:
-        >>> from api.models import Order
-        >>> from api.services import create_order_notification
-        >>> order = Order.objects.get(id=1)
-        >>> notification = create_order_notification(order)
     """
     try:
         # Prepare order items summary
         items_summary = []
+        items_list = []
         if order.items:
-            for item in order.items:
+            if isinstance(order.items, list):
+                items_list = order.items
+            elif isinstance(order.items, str):
+                try:
+                    import json
+                    items_list = json.loads(order.items)
+                except:
+                    items_list = []
+
+            for item in items_list:
                 items_summary.append({
-                    'product_name': item.get('product_name', 'Unknown'),
-                    'quantity': item.get('quantity', 1),
+                    'product_name': item.get('product_name') or item.get('name') or 'Unknown',
+                    'quantity': item.get('quantity') or item.get('qty') or 1,
                     'price': str(item.get('price', 0)),
                     'size': item.get('size', ''),
                 })
         
-        # Create notification record
-        notification = OrderNotification.objects.create(
+        # Create notification record with phone, city, address, and pincode
+        # Use get_or_create to prevent duplicate notifications for same order
+        notification, created = OrderNotification.objects.get_or_create(
             order=order,
-            customer_name=order.customer_name,
-            customer_email=order.customer_email,
-            total_amount=order.total_amount,
-            items_count=len(order.items) if order.items else 0,
-            items_summary=items_summary,
-            is_read=False,
+            defaults={
+                'customer_name': order.customer_name,
+                'customer_email': order.customer_email,
+                'phone': order.phone or 'N/A',
+                'city': order.city or 'N/A',
+                'address': order.address or 'N/A',
+                'pincode': order.pincode or 'N/A',
+                'total_amount': order.total_amount,
+                'items_count': len(items_list) if items_list else 0,
+                'items_summary': items_summary,
+                'is_read': False,
+            }
         )
         
         # Trigger WebSocket notification asynchronously
-        # This must be done asynchronously using asyncio
-        asyncio.create_task(
-            send_order_notification(
+        try:
+            from asgiref.sync import async_to_sync
+            async_to_sync(send_order_notification)(
                 order_id=order.id,
                 order_number=order.order_number,
                 customer_name=order.customer_name,
                 customer_email=order.customer_email,
+                phone=order.phone or 'N/A',
+                city=order.city or 'N/A',
+                address=order.address or 'N/A',
+                pincode=order.pincode or 'N/A',
                 total_amount=order.total_amount,
-                items_count=len(order.items) if order.items else 0,
+                items_count=len(items_list) if items_list else 0,
                 items_summary=items_summary,
                 notification_id=notification.id,
             )
-        )
+            print(f"WebSocket notification broadcasted successfully for order {order.order_number}")
+        except Exception as ws_err:
+            print(f"WebSocket async_to_sync failed, trying fallback create_task: {str(ws_err)}")
+            try:
+                asyncio.create_task(
+                    send_order_notification(
+                        order_id=order.id,
+                        order_number=order.order_number,
+                        customer_name=order.customer_name,
+                        customer_email=order.customer_email,
+                        phone=order.phone or 'N/A',
+                        city=order.city or 'N/A',
+                        address=order.address or 'N/A',
+                        pincode=order.pincode or 'N/A',
+                        total_amount=order.total_amount,
+                        items_count=len(items_list) if items_list else 0,
+                        items_summary=items_summary,
+                        notification_id=notification.id,
+                    )
+                )
+            except Exception as task_err:
+                print(f"Fallback create_task also failed: {str(task_err)}")
         
         return notification
         

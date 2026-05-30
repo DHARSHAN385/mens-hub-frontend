@@ -79,7 +79,7 @@ WSGI_APPLICATION = 'backend_project.wsgi.application'
 ASGI_APPLICATION = 'backend_project.asgi.application'
 
 
-DB_ENGINE = config('DB_ENGINE', default='django.db.backends.mysql')
+DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
 
 if DB_ENGINE == 'django.db.backends.sqlite3':
     DATABASES = {
@@ -168,6 +168,13 @@ GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
 # Google OAuth Configuration
 GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
+
+# Cashfree Payment Gateway Configuration
+CASHFREE_APP_ID = config('CASHFREE_APP_ID', default='')
+CASHFREE_SECRET_KEY = config('CASHFREE_SECRET_KEY', default='')
+CASHFREE_MODE = config('CASHFREE_MODE', default='TEST')
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000')
 
 
 # ============================================================================

@@ -7,8 +7,8 @@
 │                     DATABASE OVERVIEW                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  📦 PRODUCTS (12 records)                                   │
-│  ├─ name, description, price, category                     │
+│  📦 PRODUCTS (12 records)                                  │
+│  ├─ name, description, price, category                      │
 │  ├─ 3 image types: image_url, category_image, banner_image │
 │  ├─ sizes (JSON array), popularity, featured flag          │
 │  └─ stock, timestamps                                      │
@@ -51,27 +51,27 @@
 │        (http://localhost:8000/api/)              │
 ├──────────────────────────────────────────────────┤
 │                                                  │
-│  ViewSets (6 total)                             │
-│  ├─ ProductViewSet  (featured, category filter) │
-│  ├─ CategoryViewSet (full CRUD)                 │
-│  ├─ OrderViewSet    (status updates)            │
-│  ├─ CartViewSet     (clear cart action)         │
-│  ├─ WishlistViewSet (clear wishlist action)     │
-│  └─ BannerViewSet   (active filter)             │
+│  ViewSets (6 total)                              │
+│  ├─ ProductViewSet  (featured, category filter)  │
+│  ├─ CategoryViewSet (full CRUD)                  │
+│  ├─ OrderViewSet    (status updates)             │
+│  ├─ CartViewSet     (clear cart action)          │
+│  ├─ WishlistViewSet (clear wishlist action)      │
+│  └─ BannerViewSet   (active filter)              │
 │                                                  │
-│  Serializers (6 total)                          │
-│  ├─ ProductSerializer (with nested data)        │
-│  ├─ CategorySerializer                          │
-│  ├─ OrderSerializer (JSON items)                │
-│  ├─ CartSerializer (with product_details)       │
-│  ├─ WishlistSerializer (with product_details)   │
-│  └─ BannerSerializer                            │
+│  Serializers (6 total)                           │
+│  ├─ ProductSerializer (with nested data)         │
+│  ├─ CategorySerializer                           │
+│  ├─ OrderSerializer (JSON items)                 │
+│  ├─ CartSerializer (with product_details)        │
+│  ├─ WishlistSerializer (with product_details)    │
+│  └─ BannerSerializer                             │
 │                                                  │
-│  Models (6 total)                               │
-│  └─ All linked to MySQL database                │
+│  Models (6 total)                                │
+│  └─ All linked to MySQL database                 │
 │                                                  │
-│  Admin Panel                                    │
-│  └─ Fully configured for all 6 tables           │
+│  Admin Panel                                     │
+│  └─ Fully configured for all 6 tables            │
 │                                                  │
 └──────────────────────────────────────────────────┘
         ↓

@@ -75,7 +75,8 @@ class Product(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    category = models.CharField(max_length=50, db_index=True)
+    category_temp = models.CharField(max_length=50, db_index=True, null=True, blank=True)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products', db_index=True, null=True, blank=True)
     image_url = models.TextField(blank=True, null=True, help_text="Image URL or base64 data URL")
     images = models.JSONField(default=list, blank=True)
     stock = models.IntegerField(default=0)
@@ -138,6 +139,7 @@ class Order(models.Model):
     
     # Exchange fields
     is_delivered = models.BooleanField(default=False)
+    shipped_at = models.DateTimeField(blank=True, null=True)
     delivered_at = models.DateTimeField(blank=True, null=True)
     exchange_eligible_until = models.DateTimeField(blank=True, null=True)
     exchange_status = models.CharField(max_length=20, choices=EXCHANGE_STATUS_CHOICES, default='none')
@@ -156,6 +158,11 @@ class Order(models.Model):
                 if not Order.objects.filter(order_number=order_num).exists():
                     self.order_number = order_num
                     break
+        
+        # Set shipped_at when status becomes shipped or out_for_delivery
+        from django.utils import timezone
+        if self.status in ['shipped', 'out_for_delivery'] and not self.shipped_at:
+            self.shipped_at = timezone.now()
         
         # Calculate exchange eligibility (3-4 days from delivery)
         from datetime import timedelta
@@ -227,6 +234,8 @@ class OrderNotification(models.Model):
     items_summary = models.JSONField(default=list, help_text="Summary of order items")
     phone = models.CharField(max_length=15, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
+    address = models.TextField(blank=True, null=True, help_text="Customer delivery address")
+    pincode = models.CharField(max_length=10, blank=True, null=True)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     read_at = models.DateTimeField(blank=True, null=True)
@@ -236,6 +245,24 @@ class OrderNotification(models.Model):
     
     def __str__(self):
         return f"Order Notification - {self.order.order_number} - {self.customer_name}"
+
+
+class AdminContact(models.Model):
+    """Model to store admin contact information for support."""
+    id = models.AutoField(primary_key=True)
+    admin_name = models.CharField(max_length=200, help_text="Name of the admin")
+    whatsapp_number = models.CharField(max_length=15, help_text="WhatsApp number with country code, e.g., +919876543210")
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=15, blank=True, null=True)
+    is_active = models.BooleanField(default=True, help_text="Is this contact currently active for support")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-is_active', '-created_at']
+    
+    def __str__(self):
+        return f"{self.admin_name} - {self.whatsapp_number}"
 
 
 class Address(models.Model):

@@ -4,7 +4,8 @@ from .views import (
     ProductViewSet, OrderViewSet, CategoryViewSet, 
     CartViewSet, WishlistViewSet, BannerViewSet, api_root,
     google_oauth_login, OrderNotificationViewSet, create_order_with_notification,
-    register_user, login_user, AddressViewSet, ExchangeRequestViewSet
+    register_user, login_user, AddressViewSet, ExchangeRequestViewSet, AdminContactViewSet,
+    get_support_contact, support_with_order
 )
 from .admin_views import (
     current_user_profile, user_cart, user_wishlist, user_orders,
@@ -25,6 +26,7 @@ router.register(r'banners', BannerViewSet)
 router.register(r'notifications', OrderNotificationViewSet, basename='notification')
 router.register(r'addresses', AddressViewSet, basename='address')
 router.register(r'exchanges', ExchangeRequestViewSet, basename='exchange')
+router.register(r'admin-contacts', AdminContactViewSet, basename='admin-contact')
 
 app_name = 'api'
 
@@ -61,6 +63,10 @@ urlpatterns = [
     
     # Order notifications
     path('orders/create-with-notification/', create_order_with_notification, name='create-order-with-notification'),
+    
+    # Support endpoints
+    path('support/contact/', get_support_contact, name='get-support-contact'),
+    path('support/order/', support_with_order, name='support-with-order'),
     
     # Router endpoints
     path('', include(router.urls)),

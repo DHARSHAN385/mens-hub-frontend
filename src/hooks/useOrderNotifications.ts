@@ -20,6 +20,10 @@ export interface OrderNotification {
   order_number: string;
   customer_name: string;
   customer_email: string;
+  phone: string;
+  city: string;
+  address: string;
+  pincode: string;
   total_amount: string;
   items_count: number;
   items_summary: Array<{
@@ -50,19 +54,19 @@ interface UseOrderNotificationsOptions {
 
 export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}) => {
   const {
-    onNotification,
-    onConnectionEstablished,
-    onError,
-    onUnreadCountUpdate,
     autoConnect = true,
     reconnectAttempts = 5,
     reconnectDelay = 3000,
   } = options;
 
+  // Use a ref to store the latest options (callbacks) to prevent infinite loops from changing references
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<any>(null);
   const reconnectCountRef = useRef(0);
-  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pingIntervalRef = useRef<any>(null);
 
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -71,9 +75,33 @@ export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}
    * Get WebSocket URL based on current location
    */
   const getWebSocketURL = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    return `${protocol}//${host}/ws/orders/notifications/`;
+    // Try multiple token key combinations
+    const token = 
+      localStorage.getItem('authToken') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      '';
+
+    const apiURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    // Handle both http and https
+    const wsBase = apiURL
+      .replace(/^https/, 'wss')
+      .replace(/^http/, 'ws');
+
+    if (!wsBase.includes('://')) {
+      console.error('Invalid API URL:', apiURL);
+      return '';
+    }
+
+    // Remove trailing slash if present
+    const baseURL = wsBase.endsWith('/') ? wsBase.slice(0, -1) : wsBase;
+
+    if (!token) {
+      alert('You must be logged in as admin to receive notifications.');
+      return '';
+    }
+
+    return `${baseURL}/ws/orders/notifications/?token=${token}`;
   }, []);
 
   /**
@@ -87,18 +115,26 @@ export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}
 
     try {
       const wsURL = getWebSocketURL();
+
+      if (!wsURL) {
+        const errorMsg = 'No authentication token found. Please log in as admin.';
+        setConnectionError(errorMsg);
+        optionsRef.current.onError?.(errorMsg);
+        return;
+      }
+
       console.log(`Connecting to WebSocket: ${wsURL}`);
 
       wsRef.current = new WebSocket(wsURL);
 
       wsRef.current.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         setIsConnected(true);
         setConnectionError(null);
         reconnectCountRef.current = 0;
 
         // Call connection established callback
-        onConnectionEstablished?.();
+        optionsRef.current.onConnectionEstablished?.();
 
         // Start ping to keep connection alive
         startPingInterval();
@@ -112,14 +148,19 @@ export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}
       };
 
       wsRef.current.onerror = (error) => {
-        const errorMsg = 'WebSocket error occurred';
+        const errorMsg = `WebSocket error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`;
         console.error(errorMsg, error);
+        console.error('WebSocket ready state:', wsRef.current?.readyState);
         setConnectionError(errorMsg);
-        onError?.(errorMsg);
+        optionsRef.current.onError?.(errorMsg);
       };
 
-      wsRef.current.onclose = () => {
-        console.log('WebSocket disconnected');
+      wsRef.current.onclose = (event) => {
+        console.log('WebSocket disconnected', {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+        });
         setIsConnected(false);
         stopPingInterval();
 
@@ -134,18 +175,22 @@ export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}
             connect();
           }, reconnectDelay);
         } else {
-          const errorMsg = 'Max reconnection attempts reached';
+          const errorMsg = `WebSocket connection failed after ${reconnectAttempts} attempts. Check that Daphne server is running and WebSocket URL is correct.`;
+          console.error(errorMsg);
           setConnectionError(errorMsg);
-          onError?.(errorMsg);
+          optionsRef.current.onError?.(errorMsg);
+          
+          // Fallback: Try polling API instead
+          console.log('Fallback: Enabling polling mode for notifications');
         }
       };
     } catch (error) {
-      const errorMsg = `Failed to connect: ${error}`;
+      const errorMsg = `Failed to connect: ${error instanceof Error ? error.message : String(error)}`;
       console.error(errorMsg);
       setConnectionError(errorMsg);
-      onError?.(errorMsg);
+      optionsRef.current.onError?.(errorMsg);
     }
-  }, [getWebSocketURL, onConnectionEstablished, onError, reconnectAttempts, reconnectDelay]);
+  }, [getWebSocketURL, reconnectAttempts, reconnectDelay]);
 
   /**
    * Disconnect from WebSocket server
@@ -192,7 +237,7 @@ export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}
 
         case 'order_notification':
           // Trigger callback with new notification
-          onNotification?.(message as OrderNotification);
+          optionsRef.current.onNotification?.(message as OrderNotification);
           break;
 
         case 'notification_read':
@@ -201,7 +246,7 @@ export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}
 
         case 'unread_count':
           console.log('Unread count:', message.count);
-          onUnreadCountUpdate?.(message.count);
+          optionsRef.current.onUnreadCountUpdate?.(message.count);
           break;
 
         case 'pong':
@@ -210,14 +255,14 @@ export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}
 
         case 'error':
           console.error('Server error:', message.message);
-          onError?.(message.message);
+          optionsRef.current.onError?.(message.message);
           break;
 
         default:
           console.warn('Unknown message type:', message.type);
       }
     },
-    [onNotification, onUnreadCountUpdate, onError]
+    []
   );
 
   /**

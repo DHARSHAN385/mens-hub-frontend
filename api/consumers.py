@@ -135,6 +135,10 @@ class AdminOrderNotificationConsumer(AsyncWebsocketConsumer):
             'order_number': event['order_number'],
             'customer_name': event['customer_name'],
             'customer_email': event['customer_email'],
+            'phone': event.get('phone', 'N/A'),
+            'city': event.get('city', 'N/A'),
+            'address': event.get('address', 'N/A'),
+            'pincode': event.get('pincode', 'N/A'),
             'total_amount': str(event['total_amount']),
             'items_count': event['items_count'],
             'items_summary': event['items_summary'],
@@ -150,16 +154,27 @@ class AdminOrderNotificationConsumer(AsyncWebsocketConsumer):
     async def _is_admin(self):
         """
         Check if user is authenticated and is an admin/staff member.
-        
         Returns:
             bool: True if user is authenticated admin, False otherwise
         """
-        if not self.user or not self.user.is_authenticated:
+        if not self.user or not hasattr(self.user, 'is_authenticated') or not self.user.is_authenticated:
             return False
-        
-        # Check if user is staff or admin
-        is_staff = await sync_to_async(lambda: self.user.is_staff)()
-        return is_staff
+        # Check if user is staff or has admin profile
+        try:
+            is_staff = await sync_to_async(lambda u: getattr(u, 'is_staff', False))(self.user)
+            if is_staff:
+                return True
+            
+            # Also check UserProfile.is_admin
+            from api.models import UserProfile
+            profile = await database_sync_to_async(UserProfile.objects.filter(user=self.user).first)()
+            if profile and profile.is_admin:
+                return True
+                
+            return False
+        except Exception as e:
+            print(f"Auth error: {e}")
+            return False
     
     @database_sync_to_async
     def _mark_notification_read(self, notification_id):
@@ -202,7 +217,8 @@ class AdminOrderNotificationConsumer(AsyncWebsocketConsumer):
 
 # Group sending function to broadcast order notifications
 async def send_order_notification(order_id, order_number, customer_name, 
-                                   customer_email, total_amount, items_count, 
+                                   customer_email, phone, city, address, pincode,
+                                   total_amount, items_count, 
                                    items_summary, notification_id):
     """
     Send order notification to all connected admin users.
@@ -215,6 +231,10 @@ async def send_order_notification(order_id, order_number, customer_name,
         order_number (str): Order number
         customer_name (str): Customer name
         customer_email (str): Customer email
+        phone (str): Customer phone number
+        city (str): Customer city
+        address (str): Customer delivery address
+        pincode (str): Customer pincode
         total_amount (Decimal): Total order amount
         items_count (int): Number of items in order
         items_summary (list): Summary of order items
@@ -224,19 +244,26 @@ async def send_order_notification(order_id, order_number, customer_name,
     from django.utils import timezone
     
     channel_layer = get_channel_layer()
-    
-    await channel_layer.group_send(
-        AdminOrderNotificationConsumer.admin_group_name,
-        {
-            'type': 'order_notification',  # Method name to call
-            'order_id': order_id,
-            'order_number': order_number,
-            'customer_name': customer_name,
-            'customer_email': customer_email,
-            'total_amount': total_amount,
-            'items_count': items_count,
-            'items_summary': items_summary,
-            'notification_id': notification_id,
-            'timestamp': timezone.now().isoformat(),
-        }
-    )
+    if channel_layer is not None:
+        await channel_layer.group_send(
+            AdminOrderNotificationConsumer.admin_group_name,
+            {
+                'type': 'order_notification',  # Method name to call
+                'order_id': order_id,
+                'order_number': order_number,
+                'customer_name': customer_name,
+                'customer_email': customer_email,
+                'phone': phone,
+                'city': city,
+                'address': address,
+                'pincode': pincode,
+                'total_amount': total_amount,
+                'items_count': items_count,
+                'items_summary': items_summary,
+                'notification_id': notification_id,
+                'timestamp': timezone.now().isoformat(),
+            }
+        )
+    else:
+        # Optionally log or handle the error if channel_layer is None
+        pass

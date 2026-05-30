@@ -13,11 +13,25 @@ class Command(BaseCommand):
         # Create Categories
         categories_data = [
             {'name': 'Shirt', 'img': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500'},
+            {'name': 'T-Shirt', 'img': 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=500'},
+            {'name': 'Jeans', 'img': 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=500'},
+            {'name': 'Slides', 'img': 'https://images.unsplash.com/photo-1519864600265-abb23847ef2c?w=500'},
+            {'name': 'Shoes', 'img': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500'},
+            {'name': 'Sunglasses', 'img': 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500'},
             {'name': 'Pants', 'img': 'https://images.unsplash.com/photo-1542272604-787c62d465d1?w=500'},
             {'name': 'Jacket', 'img': 'https://images.unsplash.com/photo-1551028719-00167b16ebc5?w=500'},
-            {'name': 'Shoes', 'img': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500'},
             {'name': 'Accessories', 'img': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=500'},
+            {'name': 'Sarees', 'img': 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=500'},
         ]
+            # Seed permanent notifications (example)
+            # from api.models import Notification
+            # notifications_data = [
+            #     {'title': 'Order Placed', 'message': 'Your order has been placed successfully!', 'is_permanent': True},
+            #     ...
+            # ]
+            # for notif in notifications_data:
+            #     Notification.objects.get_or_create(title=notif['title'], defaults=notif)
+            # self.stdout.write("✅ Permanent notifications created")
         
         for cat_data in categories_data:
             cat, created = Category.objects.get_or_create(
@@ -25,9 +39,9 @@ class Command(BaseCommand):
                 defaults={'img': cat_data['img']}
             )
             if created:
-                self.stdout.write(f"  ✅ Created category: {cat.name}")
+                self.stdout.write(f"  [OK] Created category: {cat.name}")
         
-        self.stdout.write("✅ Categories created")
+        self.stdout.write("[OK] Categories created")
         
         # Create Products
         products_data = [
@@ -38,8 +52,6 @@ class Command(BaseCommand):
                 'price': '29.99',
                 'category': 'shirt',
                 'image_url': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800',
                 'stock': 100,
                 'sizes': ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
                 'popularity': 95,
@@ -51,8 +63,6 @@ class Command(BaseCommand):
                 'price': '59.99',
                 'category': 'shirt',
                 'image_url': 'https://images.unsplash.com/photo-1596399268928-a3e34fafcf76?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1596399268928-a3e34fafcf76?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=800',
                 'stock': 50,
                 'sizes': ['S', 'M', 'L', 'XL'],
                 'popularity': 80,
@@ -64,8 +74,6 @@ class Command(BaseCommand):
                 'price': '39.99',
                 'category': 'shirt',
                 'image_url': 'https://images.unsplash.com/photo-1589932870064-ca96c2b34bbe?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1589932870064-ca96c2b34bbe?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1618886251869-7bdd4dc1fd28?w=800',
                 'stock': 75,
                 'sizes': ['M', 'L', 'XL', 'XXL'],
                 'popularity': 70,
@@ -78,8 +86,6 @@ class Command(BaseCommand):
                 'price': '69.99',
                 'category': 'pants',
                 'image_url': 'https://images.unsplash.com/photo-1542272604-787c62d465d1?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1542272604-787c62d465d1?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1604653894610-df63bc536371?w=800',
                 'stock': 80,
                 'sizes': ['28', '30', '32', '34', '36', '38'],
                 'popularity': 92,
@@ -91,8 +97,6 @@ class Command(BaseCommand):
                 'price': '54.99',
                 'category': 'pants',
                 'image_url': 'https://images.unsplash.com/photo-1473966895367-ab63b27d8b16?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1473966895367-ab63b27d8b16?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1618886251869-7bdd4dc1fd28?w=800',
                 'stock': 60,
                 'sizes': ['30', '32', '34', '36'],
                 'popularity': 75,
@@ -105,8 +109,6 @@ class Command(BaseCommand):
                 'price': '199.99',
                 'category': 'jacket',
                 'image_url': 'https://images.unsplash.com/photo-1551028719-00167b16ebc5?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1551028719-00167b16ebc5?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1578921049066-f845f67c53e8?w=800',
                 'stock': 30,
                 'sizes': ['S', 'M', 'L', 'XL'],
                 'popularity': 88,
@@ -118,8 +120,6 @@ class Command(BaseCommand):
                 'price': '89.99',
                 'category': 'jacket',
                 'image_url': 'https://images.unsplash.com/photo-1611312732133-d2c4a52b8ab5?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1611312732133-d2c4a52b8ab5?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1518611505867-48546b96426d?w=800',
                 'stock': 45,
                 'sizes': ['XS', 'S', 'M', 'L', 'XL'],
                 'popularity': 72,
@@ -132,8 +132,6 @@ class Command(BaseCommand):
                 'price': '119.99',
                 'category': 'shoes',
                 'image_url': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800',
                 'stock': 100,
                 'sizes': ['6', '7', '8', '9', '10', '11', '12', '13'],
                 'popularity': 98,
@@ -145,8 +143,6 @@ class Command(BaseCommand):
                 'price': '149.99',
                 'category': 'shoes',
                 'image_url': 'https://images.unsplash.com/photo-1543163521-9efcc062b169?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1543163521-9efcc062b169?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1543163521-9efcc062b169?w=800',
                 'stock': 40,
                 'sizes': ['7', '8', '9', '10', '11', '12'],
                 'popularity': 65,
@@ -158,8 +154,6 @@ class Command(BaseCommand):
                 'price': '79.99',
                 'category': 'shoes',
                 'image_url': 'https://images.unsplash.com/photo-1604505209341-4ab8532fcc4d?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1604505209341-4ab8532fcc4d?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1604505209341-4ab8532fcc4d?w=800',
                 'stock': 70,
                 'sizes': ['7', '8', '9', '10', '11'],
                 'popularity': 78,
@@ -172,8 +166,6 @@ class Command(BaseCommand):
                 'price': '39.99',
                 'category': 'accessories',
                 'image_url': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800',
                 'stock': 150,
                 'sizes': ['S', 'M', 'L'],
                 'popularity': 85,
@@ -185,8 +177,6 @@ class Command(BaseCommand):
                 'price': '29.99',
                 'category': 'accessories',
                 'image_url': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400',
-                'category_image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200',
-                'banner_image': 'https://images.unsplash.com/photo-1592078615290-033ee584e267?w=800',
                 'stock': 120,
                 'sizes': ['One Size'],
                 'popularity': 60,
@@ -200,9 +190,9 @@ class Command(BaseCommand):
                 defaults=prod_data
             )
             if created:
-                self.stdout.write(f"  ✅ Created product: {prod.name}")
+                self.stdout.write(f"  [OK] Created product: {prod.name}")
         
-        self.stdout.write("✅ Products created")
+        self.stdout.write("[OK] Products created")
         
         # Create Banners
         banners_data = [
@@ -232,7 +222,7 @@ class Command(BaseCommand):
                 defaults=banner_data
             )
             if created:
-                self.stdout.write(f"  ✅ Created banner: {banner.title}")
+                self.stdout.write(f"  [OK] Created banner: {banner.title}")
         
-        self.stdout.write("✅ Banners created")
-        self.stdout.write(self.style.SUCCESS("\n🎉 Seed data completed successfully!"))
+        self.stdout.write("[OK] Banners created")
+        self.stdout.write(self.style.SUCCESS("\n[SUCCESS] Seed data completed successfully!"))

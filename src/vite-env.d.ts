@@ -1,5 +1,9 @@
 /// <reference types="vite/client" />
 
+interface ImportMeta {
+  readonly env: Record<string, string | undefined>;
+}
+
 declare module "*.png" {
   const content: string;
   export default content;

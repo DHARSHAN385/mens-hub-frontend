@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Product, Order, Category, Cart, Wishlist, Banner, GoogleUser, OrderNotification
+from .models import Product, Order, Category, Cart, Wishlist, Banner, GoogleUser, OrderNotification, AdminContact
 
 
 @admin.register(Category)
@@ -115,8 +115,33 @@ class OrderNotificationAdmin(admin.ModelAdmin):
         ('Order Details', {
             'fields': ('total_amount', 'items_count', 'items_summary')
         }),
+        ('Customer Information', {
+            'fields': ('phone', 'city', 'address', 'pincode')
+        }),
         ('Notification Status', {
             'fields': ('is_read', 'created_at', 'read_at')
         }),
     )
+
+
+@admin.register(AdminContact)
+class AdminContactAdmin(admin.ModelAdmin):
+    list_display = ('admin_name', 'whatsapp_number', 'email', 'is_active', 'created_at')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('admin_name', 'whatsapp_number', 'email')
+    ordering = ('-is_active', '-created_at')
+    fieldsets = (
+        ('Admin Information', {
+            'fields': ('admin_name', 'whatsapp_number', 'email', 'phone')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ('created_at', 'updated_at')
+
 

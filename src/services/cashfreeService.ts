@@ -5,6 +5,12 @@
 
 import { apiCall } from "../api/client";
 
+declare global {
+  interface Window {
+    Cashfree: any;
+  }
+}
+
 interface CashfreeConfig {
   appId: string;
   mode: "TEST" | "PROD";
@@ -43,8 +49,8 @@ export class CashfreeService {
     try {
       console.log(`📦 Initiating payment for order: ${data.orderId}`);
 
-      const response = await apiCall(
-        "/orders/initiate_payment/",
+      const result = await apiCall(
+        "/api/orders/initiate_payment/",
         "POST",
         {
           order_id: data.orderId,
@@ -55,9 +61,6 @@ export class CashfreeService {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to initiate payment");
-
-      const result = await response.json();
       console.log(`✅ Payment initiated:`, result);
       return result;
     } catch (error) {
@@ -73,8 +76,8 @@ export class CashfreeService {
     try {
       console.log(`🔐 Verifying payment: ${data.paymentId}`);
 
-      const response = await apiCall(
-        "/orders/verify_payment/",
+      const result = await apiCall(
+        "/api/orders/verify_payment/",
         "POST",
         {
           order_id: data.orderId,
@@ -84,9 +87,6 @@ export class CashfreeService {
         }
       );
 
-      if (!response.ok) throw new Error("Payment verification failed");
-
-      const result = await response.json();
       console.log(`✅ Payment verified:`, result);
       return result;
     } catch (error) {
@@ -97,33 +97,46 @@ export class CashfreeService {
 
   /**
    * Open Cashfree payment modal
-   * Note: This requires Cashfree's JavaScript SDK
    */
   async openPaymentModal(sessionId: string, orderId: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      // This will use Cashfree's official SDK
-      // For now, we'll return a mock response
       console.log(`🎯 Opening Cashfree payment modal for order: ${orderId}`);
 
-      // In production, you would call Cashfree's SDK like:
-      // const cashfree = new Cashfree();
-      // cashfree.checkout({
-      //   paymentSessionId: sessionId,
-      //   redirectTarget: "_modal",
-      // }).then((result) => {
-      //   if (result.error) reject(result.error);
-      //   resolve(result);
-      // });
+      if (typeof window.Cashfree === "undefined") {
+        console.error("❌ Cashfree SDK not loaded in window.");
+        reject(new Error("Cashfree SDK not loaded. Please try again."));
+        return;
+      }
 
-      // For demo, simulate successful payment after 2 seconds
-      setTimeout(() => {
-        resolve({
-          orderId: orderId,
-          txnId: `CF_${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-          orderStatus: "PAID",
-          paymentMethod: "upi",
+      try {
+        const cashfree = window.Cashfree({
+          mode: this.config?.mode === "PROD" ? "production" : "sandbox",
         });
-      }, 2000);
+
+        cashfree.checkout({
+          paymentSessionId: sessionId,
+          redirectTarget: "_modal", // Opens checkout in an iframe popup overlay
+        }).then((result: any) => {
+          if (result.error) {
+            console.error("❌ Cashfree Payment Checkout Error:", result.error);
+            reject(result.error);
+          } else {
+            console.log("✅ Cashfree Checkout success callback:", result);
+            resolve({
+              orderId: orderId,
+              txnId: result.paymentId || `CF_TXN_${orderId}`,
+              orderStatus: "PAID",
+              paymentMethod: result.paymentMethod || "upi",
+            });
+          }
+        }).catch((err: any) => {
+          console.error("❌ Cashfree checkout promise catch:", err);
+          reject(err);
+        });
+      } catch (err) {
+        console.error("❌ Error initializing Cashfree SDK checkout:", err);
+        reject(err);
+      }
     });
   }
 

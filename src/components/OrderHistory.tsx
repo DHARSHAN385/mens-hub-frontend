@@ -12,7 +12,7 @@ interface OrderItem {
 interface Order {
   id: number;
   order_number: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled';
   total_amount: number;
   items: OrderItem[];
   tracking_number?: string;
@@ -20,7 +20,11 @@ interface Order {
   updated_at: string;
   customer_name: string;
   customer_email: string;
+  phone?: string;
+  address?: string;
 }
+
+import { CONFIG } from '../app/config';
 
 interface OrderHistoryProps {
   onBack?: () => void;
@@ -30,9 +34,9 @@ interface OrderHistoryProps {
 const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
 
 const STATUS_CONFIG = {
-  pending: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50', label: 'Pending' },
-  processing: { icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', label: 'Processing' },
+  pending: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50', label: 'Placed' },
   shipped: { icon: Truck, color: 'text-purple-600', bg: 'bg-purple-50', label: 'Shipped' },
+  out_for_delivery: { icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', label: 'Out for Delivery' },
   delivered: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', label: 'Delivered' },
   cancelled: { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', label: 'Cancelled' },
 };
@@ -114,9 +118,9 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onBack, authToken })
           <div className="mb-8">
             <h3 className="font-semibold text-lg mb-4 dark:text-white">Order Status</h3>
             <div className="space-y-4">
-              {['pending', 'processing', 'shipped', 'delivered'].map((s) => {
-                const isCompleted = ['pending', 'processing', 'shipped', 'delivered'].indexOf(s) <= 
-                                   ['pending', 'processing', 'shipped', 'delivered'].indexOf(selectedOrder.status);
+              {['pending', 'shipped', 'out_for_delivery', 'delivered'].map((s) => {
+                const isCompleted = ['pending', 'shipped', 'out_for_delivery', 'delivered'].indexOf(s) <= 
+                                   ['pending', 'shipped', 'out_for_delivery', 'delivered'].indexOf(selectedOrder.status);
                 const config = STATUS_CONFIG[s as keyof typeof STATUS_CONFIG];
                 const Icon = config.icon;
 
@@ -155,6 +159,26 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onBack, authToken })
               <p className="font-mono font-semibold text-lg text-blue-600 dark:text-blue-300">
                 {selectedOrder.tracking_number}
               </p>
+            </div>
+          )}
+
+          {/* WhatsApp Contact */}
+          {(selectedOrder.status === 'shipped' || selectedOrder.status === 'out_for_delivery' || selectedOrder.status === 'delivered') && (
+            <div className="mb-8 p-4 bg-green-50 dark:bg-green-900 rounded-lg flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-green-800 dark:text-green-100">Need help with this order?</p>
+                <p className="text-sm text-green-700 dark:text-green-300">Contact admin directly via WhatsApp</p>
+              </div>
+              <button
+                onClick={() => {
+                  const adminPhone = CONFIG.WHATSAPP_ADMIN || '919876543210';
+                  const text = `Hi, I have a query regarding my order.\n\nCustomer: ${selectedOrder.customer_name}\nOrder ID: ${selectedOrder.order_number}\nPhone: ${selectedOrder.phone || 'Not provided'}\nAddress: ${selectedOrder.address || 'Not provided'}\n\nQuery: `;
+                  window.open(`https://wa.me/${adminPhone.replace('+', '')}?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition"
+              >
+                Contact via WhatsApp
+              </button>
             </div>
           )}
 
