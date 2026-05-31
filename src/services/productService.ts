@@ -30,18 +30,14 @@ export interface Product {
 const processImageUrl = (imageUrl?: string): string => {
   if (!imageUrl) return '';
   
-  // If it's already an absolute URL, return as is
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    return imageUrl;
-  }
-  
+  let result = imageUrl;
   // If it's a relative URL (starts with /), prepend backend URL
   if (imageUrl.startsWith('/')) {
-    return `${BACKEND_URL}${imageUrl}`;
+    result = `${BACKEND_URL}${imageUrl}`;
   }
   
-  // If it's a data URL or something else, return as is
-  return imageUrl;
+  // Replace spaces with %20 so browsers can load them correctly without URL formatting errors
+  return result.replace(/ /g, '%20');
 };
 
 /**

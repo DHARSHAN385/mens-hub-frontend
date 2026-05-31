@@ -79,9 +79,11 @@ const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.on
 
 function absoluteUrl(url?: string): string {
   if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/')) return `${BACKEND_URL}${url}`;
-  return url;
+  let result = url;
+  if (url.startsWith('/')) {
+    result = `${BACKEND_URL}${url}`;
+  }
+  return result.replace(/ /g, '%20');
 }
 
 export function parseBannerConfig(bannerData?: string): BannerConfig {
