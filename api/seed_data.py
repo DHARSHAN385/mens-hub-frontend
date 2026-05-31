@@ -236,7 +236,7 @@ def seed_data():
     
     print("✅ Products created")
     
-    # Create Banners
+    # Create/Update Banners (always reset to external URLs since Render has ephemeral storage)
     banners_data = [
         {
             'image_url': 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200',
@@ -259,7 +259,7 @@ def seed_data():
     ]
     
     for banner_data in banners_data:
-        Banner.objects.get_or_create(
+        Banner.objects.update_or_create(
             title=banner_data['title'],
             defaults=banner_data
         )
