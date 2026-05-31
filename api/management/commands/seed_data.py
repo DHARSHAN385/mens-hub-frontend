@@ -185,9 +185,29 @@ class Command(BaseCommand):
         ]
         
         for prod_data in products_data:
+            cat_name = prod_data.get('category')
+            cat_map = {
+                'shirt': 'Shirt',
+                'tshirt': 'T-Shirt',
+                'jeans': 'Jeans',
+                'slides': 'Slides',
+                'shoes': 'Shoes',
+                'sunglass': 'Sunglasses',
+                'pants': 'Pants',
+                'jacket': 'Jacket',
+                'accessories': 'Accessories',
+                'sarees': 'Sarees',
+            }
+            mapped_cat_name = cat_map.get(cat_name, cat_name.capitalize() if cat_name else 'Shirt')
+            category_obj, _ = Category.objects.get_or_create(name=mapped_cat_name)
+            
+            defaults_data = prod_data.copy()
+            defaults_data['category'] = category_obj
+            defaults_data['category_temp'] = cat_name
+
             prod, created = Product.objects.get_or_create(
                 name=prod_data['name'],
-                defaults=prod_data
+                defaults=defaults_data
             )
             if created:
                 self.stdout.write(f"  [OK] Created product: {prod.name}")
