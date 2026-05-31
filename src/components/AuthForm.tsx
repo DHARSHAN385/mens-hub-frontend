@@ -13,7 +13,7 @@ interface AuthFormProps {
   onBack?: () => void;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
 
 export const AuthForm: React.FC<AuthFormProps> = ({ 
   mode, 

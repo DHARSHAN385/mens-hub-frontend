@@ -54,7 +54,7 @@ export const GoogleLogin: React.FC<GoogleLoginProps> = ({
       }
 
       // Get API URL from environment
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
       debug('Using API URL', apiUrl);
 
       // Send the token to backend

@@ -41,7 +41,7 @@ interface CreateOrderResponse {
   };
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
 
 export const OrderCreationExample: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);

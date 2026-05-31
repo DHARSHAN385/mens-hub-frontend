@@ -21,7 +21,7 @@ interface AddressManagerProps {
   authToken?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
 
 export const AddressManager: React.FC<AddressManagerProps> = ({ onBack, authToken }) => {
   const [addresses, setAddresses] = useState<Address[]>([]);

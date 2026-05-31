@@ -12,7 +12,7 @@
  * - Storage: PERMANENT - Data persists across server restarts
  * 
  * API Endpoints:
- * - Base URL: http://localhost:8000/api (local) or https://dharshan.pythonanywhere.com/api (production)
+ * - Base URL: http://localhost:8000/api (local) or https://mens-hub-backend.onrender.com/api (production)
  * - Products: /api/products/
  * - Orders: /api/orders/
  * - Cart: /api/cart/
@@ -67,7 +67,7 @@ export const dbConfig = {
   databaseType: 'MySQL (Permanent)',
   
   // API Configuration
-  apiUrl: import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com',
+  apiUrl: import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com',
   apiBasePath: '/api',
   
   // Authentication

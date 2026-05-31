@@ -2,7 +2,7 @@
 // Centralized configuration for API calls
 
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'https://dharshan.pythonanywhere.com/api',
+  BASE_URL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'https://mens-hub-backend.onrender.com/api',
   TIMEOUT: 10000, // 10 seconds
   
   ENDPOINTS: {

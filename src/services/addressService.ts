@@ -1,6 +1,6 @@
 // Address service for managing user addresses
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com/api';
 
 export interface Address {
   id: number;

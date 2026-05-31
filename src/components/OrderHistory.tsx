@@ -31,7 +31,7 @@ interface OrderHistoryProps {
   authToken?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
 
 const STATUS_CONFIG = {
   pending: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50', label: 'Placed' },

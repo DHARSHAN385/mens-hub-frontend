@@ -3,7 +3,7 @@
 
 import { apiCall } from '../api/client';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://dharshan.pythonanywhere.com';
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
 
 // In-memory cache for products and categories
 let productsCache: any[] | null = null;
