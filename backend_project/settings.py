@@ -97,6 +97,7 @@ else:
             'PASSWORD': config('DB_PASSWORD', default=''),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='3306'),
+            'CONN_MAX_AGE': 60,
             'OPTIONS': {
                 'ssl_mode': 'REQUIRED',
             }

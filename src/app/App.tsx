@@ -195,6 +195,7 @@ export default function App(): React.ReactElement {
   const [bannerImg, setBannerImg] = useState(""); // Default empty banner
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
   const [dark, setDark] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Load all data on app startup
   useEffect(() => {
@@ -208,6 +209,38 @@ export default function App(): React.ReactElement {
     const savedUser = localStorage.getItem('user');
     if (savedUser) try { setUser(JSON.parse(savedUser)); } catch { }
 
+    // Load cached data from localStorage for instant display (Stale-While-Revalidate)
+    const cachedProducts = localStorage.getItem('cachedProducts');
+    const cachedCategories = localStorage.getItem('cachedCategories');
+    const cachedBanner = localStorage.getItem('cachedBanner');
+    
+    let hasCache = false;
+    if (cachedProducts) {
+      try { 
+        const parsed = JSON.parse(cachedProducts);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProducts(parsed);
+          hasCache = true;
+        }
+      } catch { }
+    }
+    if (cachedCategories) {
+      try { 
+        const parsed = JSON.parse(cachedCategories);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCategories(parsed);
+          hasCache = true;
+        }
+      } catch { }
+    }
+    if (cachedBanner) {
+      setBannerImg(cachedBanner);
+    }
+    
+    if (hasCache) {
+      setLoading(false); // Instantly render cached content
+    }
+
     // Load all data from permanent database storage
     const loadData = async () => {
       try {
@@ -216,11 +249,22 @@ export default function App(): React.ReactElement {
           adminService.loadCategoriesFromDB(),
           adminService.loadBannerFromSettings()
         ]);
-        if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
-        if (dbCategories && dbCategories.length > 0) setCategories(dbCategories);
-        if (dbBanner) setBannerImg(dbBanner);
+        if (dbProducts && dbProducts.length > 0) {
+          setProducts(dbProducts);
+          localStorage.setItem('cachedProducts', JSON.stringify(dbProducts));
+        }
+        if (dbCategories && dbCategories.length > 0) {
+          setCategories(dbCategories);
+          localStorage.setItem('cachedCategories', JSON.stringify(dbCategories));
+        }
+        if (dbBanner) {
+          setBannerImg(dbBanner);
+          localStorage.setItem('cachedBanner', dbBanner);
+        }
       } catch (err) {
         console.warn("Could not load data from database:", err);
+      } finally {
+        setLoading(false); // Stop loading screen once DB results arrive
       }
     };
     loadData();
@@ -265,14 +309,17 @@ export default function App(): React.ReactElement {
       ]);
       if (dbProducts && dbProducts.length > 0) {
         setProducts(dbProducts);
+        localStorage.setItem('cachedProducts', JSON.stringify(dbProducts));
         console.log('✅ Products refreshed from DB');
       }
       if (dbCategories && dbCategories.length > 0) {
         setCategories(dbCategories);
+        localStorage.setItem('cachedCategories', JSON.stringify(dbCategories));
         console.log('✅ Categories refreshed from DB');
       }
       if (dbBanner) {
         setBannerImg(dbBanner);
+        localStorage.setItem('cachedBanner', dbBanner);
         console.log('✅ Banner refreshed from DB');
       }
     } catch (err) {
@@ -338,6 +385,26 @@ export default function App(): React.ReactElement {
     ["--accent-fg" as any]: dark ? "#0a0a0a" : "#ffffff",
     ["--accent-glow" as any]: dark ? "rgba(212,175,55,0.65)" : "rgba(30,58,138,0.30)",
   } as React.CSSProperties;
+
+  if (loading) {
+    return (
+      <div className={`min-h-screen w-full flex flex-col items-center justify-center ${dark ? "bg-neutral-950 text-neutral-100" : "bg-neutral-50 text-neutral-900"}`} style={accentVars}>
+        <div className="flex flex-col items-center gap-4">
+          <img src={logoImg} alt="Men's Hub" className="h-16 w-16 rounded-xl object-cover object-top animate-pulse" style={{ boxShadow: "0 0 0 2.5px var(--accent), 0 4px 20px var(--accent-glow)" }} />
+          <div className="flex flex-col items-center leading-none">
+            <span className="tracking-[0.25em] uppercase text-lg" style={{ fontWeight: 700, color: "var(--accent)" }}>Men's Hub</span>
+            <span className="text-xs tracking-widest uppercase mt-1.5" style={{ color: "var(--accent-soft)", opacity: 0.85 }}>Be Your Own Label</span>
+          </div>
+          <div className="mt-6 flex gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "0ms" }}></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "150ms" }}></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "300ms" }}></div>
+          </div>
+          <span className="text-[10px] uppercase tracking-widest text-neutral-400 mt-2 animate-pulse">Initializing Server...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen w-full ${dark ? "bg-neutral-950 text-neutral-100" : "bg-neutral-50 text-neutral-900"} transition-colors`} style={accentVars}>
