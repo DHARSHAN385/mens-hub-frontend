@@ -303,9 +303,9 @@ export default function App(): React.ReactElement {
     console.log('🔄 Refreshing data from database...');
     try {
       const [dbProducts, dbCategories, dbBanner] = await Promise.all([
-        adminService.loadProductsFromDB(),
-        adminService.loadCategoriesFromDB(),
-        adminService.loadBannerFromSettings()
+        adminService.loadProductsFromDB(true),
+        adminService.loadCategoriesFromDB(true),
+        adminService.loadBannerFromSettings(true)
       ]);
       if (dbProducts && dbProducts.length > 0) {
         setProducts(dbProducts);
