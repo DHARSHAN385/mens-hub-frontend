@@ -89,6 +89,10 @@ if DB_ENGINE == 'django.db.backends.sqlite3':
         }
     }
 else:
+    db_options = {}
+    if config('DB_SSL_REQUIRED', default=False, cast=bool):
+        db_options['ssl_mode'] = 'REQUIRED'
+        
     DATABASES = {
         'default': {
             'ENGINE': DB_ENGINE,
@@ -98,9 +102,7 @@ else:
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='3306'),
             'CONN_MAX_AGE': 60,
-            'OPTIONS': {
-                'ssl_mode': 'REQUIRED',
-            }
+            'OPTIONS': db_options,
         }
     }
 
