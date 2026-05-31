@@ -153,7 +153,11 @@ export const saveProduct = async (product: any): Promise<any> => {
         console.log('✅ Product PERMANENTLY updated in DB:', response);
         clearCache();
         if (response && typeof response === 'object' && response.id && response.name) {
-          return response;
+          return {
+            ...response,
+            image_url: processImageUrl(response.image_url),
+            images: Array.isArray(response.images) ? response.images.map(processImageUrl) : [processImageUrl(response.image_url)]
+          };
         } else {
           console.warn('⚠️ Backend returned invalid/empty product object, falling back to previous:', response);
           return { ...backendProduct, id: product.id };
@@ -168,7 +172,11 @@ export const saveProduct = async (product: any): Promise<any> => {
         console.log('✅ Product PERMANENTLY created in DB:', response);
         clearCache();
         if (response && typeof response === 'object' && response.id && response.name) {
-          return response;
+          return {
+            ...response,
+            image_url: processImageUrl(response.image_url),
+            images: Array.isArray(response.images) ? response.images.map(processImageUrl) : [processImageUrl(response.image_url)]
+          };
         } else {
           console.warn('⚠️ Backend returned invalid/empty product object, falling back to previous:', response);
           return backendProduct;
@@ -234,7 +242,7 @@ export const saveCategory = async (category: any): Promise<any> => {
         const response = await apiCall(`/api/categories/${category.id}/`, 'PUT', backendCategory);
         console.log('✅ Category PERMANENTLY updated in DB:', response);
         clearCache();
-        return response || { ...backendCategory, id: category.id };
+        return response ? { ...response, img: processImageUrl(response.img) } : { ...backendCategory, id: category.id };
       } catch (error: any) {
         console.error('❌ Failed to update category in database:', error);
         throw new Error(`Failed to update category: ${error.message}`);
@@ -246,7 +254,7 @@ export const saveCategory = async (category: any): Promise<any> => {
         const response = await apiCall('/api/categories/', 'POST', backendCategory);
         console.log('✅ Category PERMANENTLY created in DB:', response);
         clearCache();
-        return response || backendCategory;
+        return response ? { ...response, img: processImageUrl(response.img) } : backendCategory;
       } catch (error: any) {
         console.error('❌ Failed to create category in database:', error);
         throw new Error(`Failed to create category: ${error.message}`);
@@ -304,7 +312,9 @@ export const loadProductsFromDB = async (forceRefresh = false): Promise<any[]> =
     }
     // Transform backend format to frontend format if needed
     const transformed = data.map((p: any) => ({
-      ...p
+      ...p,
+      image_url: processImageUrl(p.image_url),
+      images: Array.isArray(p.images) ? p.images.map(processImageUrl) : [processImageUrl(p.image_url)]
     }));
     console.log(`✅ Successfully loaded ${transformed.length} products from DATABASE`);
     productsCache = transformed;
@@ -343,7 +353,7 @@ export const loadCategoriesFromDB = async (forceRefresh = false): Promise<any[]>
     const transformed = data.map((c: any) => ({
       id: c.id,
       name: c.name,
-      img: c.img || '',
+      img: processImageUrl(c.img || ''),
     }));
     console.log(`✅ Successfully loaded ${transformed.length} categories from DATABASE`);
     categoriesCache = transformed;

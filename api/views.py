@@ -85,12 +85,12 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 class ProductViewSet(viewsets.ModelViewSet):
     """ViewSet for Product model."""
-    queryset = Product.objects.all()
+    queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrReadOnly]
     
     def get_queryset(self) -> Any:
-        queryset = Product.objects.all()
+        queryset = Product.objects.select_related('category').all()
         category = self.request.query_params.get('category')  # type: ignore
         featured = self.request.query_params.get('featured')  # type: ignore
         
@@ -122,7 +122,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def featured(self, request):
         """Get all featured products."""
-        featured_products = Product.objects.filter(featured=True)
+        featured_products = Product.objects.select_related('category').filter(featured=True)
         serializer = self.get_serializer(featured_products, many=True)
         return Response(serializer.data)
 
@@ -165,8 +165,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                 is_admin = False
                 
         if is_admin:
-            return Order.objects.all()
-        return Order.objects.filter(user=user)
+            return Order.objects.select_related('user').all()
+        return Order.objects.select_related('user').filter(user=user)
     
     def perform_create(self, serializer: Any) -> None:
         """Create order for current user and generate notification for admin."""

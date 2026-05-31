@@ -327,7 +327,7 @@ def admin_all_orders(request):
             status=status.HTTP_403_FORBIDDEN
         )
     
-    orders = Order.objects.all().order_by('-created_at')
+    orders = Order.objects.select_related('user').all().order_by('-created_at')
     serializer = OrderSerializer(orders, many=True)
     return Response(serializer.data)
 
@@ -526,7 +526,7 @@ def admin_order_history(request):
     days = request.query_params.get('days', 0)  # 0 = all, 7 = week, 30 = month
     status_filter = request.query_params.get('status')  # pending, processing, shipped, delivered, cancelled
     
-    orders = Order.objects.all().order_by('-created_at')
+    orders = Order.objects.select_related('user').all().order_by('-created_at')
     
     # Apply date filter
     if days:

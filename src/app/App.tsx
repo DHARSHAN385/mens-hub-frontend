@@ -75,6 +75,15 @@ export interface BannerConfig {
   mobile_y: number;
 }
 
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
+
+function absoluteUrl(url?: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/')) return `${BACKEND_URL}${url}`;
+  return url;
+}
+
 export function parseBannerConfig(bannerData?: string): BannerConfig {
   const fallbackBanner = CONFIG.FALLBACK_BANNER || "";
   if (!bannerData) {
@@ -95,8 +104,8 @@ export function parseBannerConfig(bannerData?: string): BannerConfig {
     try {
       const parsed = JSON.parse(trimmed);
       return {
-        desktop_url: parsed.desktop_url || fallbackBanner,
-        mobile_url: parsed.mobile_url || fallbackBanner,
+        desktop_url: absoluteUrl(parsed.desktop_url) || fallbackBanner,
+        mobile_url: absoluteUrl(parsed.mobile_url) || fallbackBanner,
         desktop_zoom: typeof parsed.desktop_zoom === 'number' ? parsed.desktop_zoom : 100,
         desktop_x: typeof parsed.desktop_x === 'number' ? parsed.desktop_x : 50,
         desktop_y: typeof parsed.desktop_y === 'number' ? parsed.desktop_y : 50,
@@ -110,8 +119,8 @@ export function parseBannerConfig(bannerData?: string): BannerConfig {
   }
   
   return {
-    desktop_url: bannerData,
-    mobile_url: bannerData,
+    desktop_url: absoluteUrl(bannerData),
+    mobile_url: absoluteUrl(bannerData),
     desktop_zoom: 100,
     desktop_x: 50,
     desktop_y: 50,
