@@ -45,14 +45,85 @@ const processImageUrl = (imageUrl?: string): string => {
 };
 
 /**
+ * Compresses and resizes an image client-side before uploading to Hostinger database.
+ * Resizes to a maximum dimension of 1200px and applies 80% JPEG/PNG compression.
+ * @param {File} file - The original uploaded file.
+ * @returns {Promise<File>} Compressed File or original if compression fails/is not an image.
+ */
+export const compressImage = async (file: File, maxWidth = 1200, quality = 0.8): Promise<File> => {
+  if (!file.type.startsWith('image/')) return file;
+  
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Calculate new dimensions maintaining aspect ratio
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Output as jpeg or png based on type, jpeg/webp supports quality parameter
+        const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            // Construct a new file
+            const ext = outputType === 'image/jpeg' ? '.jpg' : '.png';
+            const originalName = file.name.includes('.') ? file.name.substring(0, file.name.lastIndexOf('.')) : file.name;
+            const newName = `${originalName}${ext}`;
+            const compressedFile = new File([blob], newName, {
+              type: outputType,
+              lastModified: Date.now()
+            });
+            console.log(`📉 Client-side Image Compression: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024).toFixed(1)}KB`);
+            resolve(compressedFile);
+          },
+          outputType,
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
+/**
  * Upload image to backend and get URL
  * @param {File} file - Image file to upload
  * @returns {Promise<string>} Image URL
  */
 export const uploadImage = async (file: File): Promise<string> => {
   try {
+    // Compress image client-side first to dramatically improve page load performance
+    console.log('⏳ Optimizing and compressing image before upload...');
+    const optimizedFile = await compressImage(file, 1200, 0.8);
+    
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('image', optimizedFile);
 
     const response = await fetch('https://menshub64.in/media/upload.php?secret=Dharshan_MensHub_Secret_2026', {
       method: 'POST',

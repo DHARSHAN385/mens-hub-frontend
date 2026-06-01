@@ -48,13 +48,84 @@
       }
       </script>
 
-      <!-- Load Cashfree SDK deferred so it does not block page render -->
-      <script src="https://sdk.cashfree.com/js/v3/cashfree.js" defer></script>
     </head>
 
-    <body>
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
+  <body>
+    <div id="root">
+      <!-- Instant Static HTML Loading Screen for 100/100 Lighthouse Performance -->
+      <style>
+        .loading-container {
+          min-height: 100vh;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background-color: #0a0a0a;
+          color: #ffffff;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        .logo-pulse {
+          width: 64px;
+          height: 64px;
+          border-radius: 12px;
+          object-fit: cover;
+          object-position: top;
+          box-shadow: 0 0 0 2.5px #d4af37, 0 4px 20px rgba(212,175,55,0.65);
+          animation: pulse-animation 1.5s infinite ease-in-out;
+        }
+        .title-text {
+          letter-spacing: 0.25em;
+          text-transform: uppercase;
+          font-size: 18px;
+          font-weight: 700;
+          color: #d4af37;
+          margin-top: 16px;
+        }
+        .tagline-text {
+          font-size: 12px;
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
+          margin-top: 6px;
+          color: #b8860b;
+          opacity: 0.85;
+        }
+        .dots-container {
+          margin-top: 24px;
+          display: flex;
+          gap: 6px;
+        }
+        .dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background-color: #f5d97a;
+          animation: bounce-animation 1.4s infinite ease-in-out both;
+        }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes pulse-animation {
+          0%, 100% { transform: scale(1); opacity: 0.9; }
+          50% { transform: scale(1.05); opacity: 1; }
+        }
+        @keyframes bounce-animation {
+          0%, 80%, 100% { transform: scale(0); }
+          40% { transform: scale(1); }
+        }
+      </style>
+      <div class="loading-container">
+        <!-- Reusable logo fallbacks -->
+        <img src="/favicon.png" alt="Men's Hub" class="logo-pulse" onerror="this.style.display='none'" />
+        <div class="title-text">Men's Hub</div>
+        <div class="tagline-text">Be Your Own Label</div>
+        <div class="dots-container">
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
   </html>
   

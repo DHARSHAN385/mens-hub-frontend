@@ -96,9 +96,38 @@ export class CashfreeService {
   }
 
   /**
+   * Dynamically load the Cashfree SDK script on-demand
+   */
+  private loadScript(): Promise<void> {
+    if (typeof window.Cashfree !== "undefined") return Promise.resolve();
+    
+    return new Promise((resolve, reject) => {
+      console.log("⏳ Dynamically loading Cashfree SDK...");
+      const script = document.createElement("script");
+      script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+      script.async = true;
+      script.onload = () => {
+        console.log("✅ Cashfree SDK loaded dynamically successfully!");
+        resolve();
+      };
+      script.onerror = () => {
+        console.error("❌ Failed to load Cashfree SDK dynamically.");
+        reject(new Error("Failed to load Cashfree payment gateway SDK"));
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  /**
    * Open Cashfree payment modal
    */
   async openPaymentModal(sessionId: string, orderId: string): Promise<any> {
+    try {
+      await this.loadScript();
+    } catch (err: any) {
+      return Promise.reject(err);
+    }
+
     return new Promise((resolve, reject) => {
       console.log(`🎯 Opening Cashfree payment modal for order: ${orderId}`);
 

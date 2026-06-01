@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
 import { CONFIG } from "./config";
 import { cartService } from "../services/cartService";
 import { wishlistService } from "../services/wishlistService";
@@ -34,8 +34,9 @@ import { GoogleLogin } from "../components/GoogleLogin";
 import { AuthForm } from "../components/AuthForm";
 import { AdminOrderNotificationCenter } from "../components/AdminOrderNotificationCenter";
 import adminService from "../services/adminService";
-import AboutUs from "./pages/AboutUs";
-import Policies from "./pages/Policies";
+
+const AboutUs = lazy(() => import("./pages/AboutUs"));
+const Policies = lazy(() => import("./pages/Policies"));
 import {
   Search, ShoppingBag, User, Heart, Home, Grid3x3, Package,
   Menu, X, Plus, Minus, Trash2, ChevronRight, MapPin, Phone, Mail,
@@ -462,25 +463,6 @@ export default function App(): React.ReactElement {
     ["--accent-glow" as any]: dark ? "rgba(212,175,55,0.65)" : "rgba(30,58,138,0.30)",
   } as React.CSSProperties;
 
-  if (loading) {
-    return (
-      <div className={`min-h-screen w-full flex flex-col items-center justify-center ${dark ? "bg-neutral-950 text-neutral-100" : "bg-neutral-50 text-neutral-900"}`} style={accentVars}>
-        <div className="flex flex-col items-center gap-4">
-          <img src={logoImg} alt="Men's Hub" width="64" height="64" className="h-16 w-16 rounded-xl object-cover object-top animate-pulse" style={{ boxShadow: "0 0 0 2.5px var(--accent), 0 4px 20px var(--accent-glow)" }} />
-          <div className="flex flex-col items-center leading-none">
-            <span className="tracking-[0.25em] uppercase text-lg" style={{ fontWeight: 700, color: "var(--accent)" }}>Men's Hub</span>
-            <span className="text-xs tracking-widest uppercase mt-1.5" style={{ color: "var(--accent-soft)", opacity: 0.85 }}>Be Your Own Label</span>
-          </div>
-          <div className="mt-6 flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "0ms" }}></div>
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "150ms" }}></div>
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "300ms" }}></div>
-          </div>
-          <span className="text-[10px] uppercase tracking-widest text-neutral-400 mt-2 animate-pulse">Initializing Server...</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={`min-h-screen w-full ${dark ? "bg-neutral-950 text-neutral-100" : "bg-neutral-50 text-neutral-900"} transition-colors`} style={accentVars}>
@@ -536,7 +518,8 @@ export default function App(): React.ReactElement {
             onCategory={(id: string) => navigate({ name: "category", id })}
             onProduct={(id: string) => navigate({ name: "product", id })}
             onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist}
-            onAllCategories={() => navigate({ name: "categories" })} />
+            onAllCategories={() => navigate({ name: "categories" })}
+            loading={loading} />
         )}
         {page.name === "categories" && (
           <CategoriesPage categories={categories}
@@ -610,10 +593,22 @@ export default function App(): React.ReactElement {
             onBack={() => { refreshDataFromDB(); back(); }} />
         )}
         {page.name === "aboutus" && (
-          <AboutUs onBack={back} />
+          <Suspense fallback={
+            <div className="flex justify-center items-center h-64">
+              <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          }>
+            <AboutUs onBack={back} />
+          </Suspense>
         )}
         {page.name === "policies" && (
-          <Policies onBack={back} />
+          <Suspense fallback={
+            <div className="flex justify-center items-center h-64">
+              <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          }>
+            <Policies onBack={back} />
+          </Suspense>
         )}
       </main>
 
@@ -912,9 +907,39 @@ function SearchOverlay({ products, onClose, onSelect, onSearch }: any) {
   );
 }
 
+/* ─────────────────── Skeletons for Performance ─────────────────── */
+function SkeletonBanner() {
+  return (
+    <div className="w-full h-full bg-neutral-200 dark:bg-neutral-800 animate-pulse flex items-center justify-center">
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-neutral-400 dark:text-neutral-600 uppercase text-xs tracking-widest font-bold">Loading Premium Fashion...</span>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonCategory() {
+  return (
+    <div className="flex flex-col items-center gap-2 animate-pulse">
+      <div className="aspect-square w-full rounded-xl bg-neutral-200 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700" />
+      <div className="h-4 w-12 bg-neutral-200 dark:bg-neutral-800 rounded mt-2 mx-auto" />
+    </div>
+  );
+}
+
+function SkeletonProductCard() {
+  return (
+    <div className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 flex flex-col gap-2 animate-pulse">
+      <div className="aspect-[3/4] w-full rounded-lg bg-neutral-200 dark:bg-neutral-800" />
+      <div className="h-4 w-3/4 bg-neutral-200 dark:bg-neutral-800 rounded mt-1" />
+      <div className="h-4 w-1/3 bg-neutral-200 dark:bg-neutral-800 rounded" />
+      <div className="h-8 w-full bg-neutral-200 dark:bg-neutral-800 rounded mt-2" />
+    </div>
+  );
+}
+
 /* ─────────────────── Home Page ─────────────────── */
-/* ─────────────────── Home Page ─────────────────── */
-function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBuy, onWish, wishlist, onAllCategories }: any) {
+function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBuy, onWish, wishlist, onAllCategories, loading }: any) {
   const visibleCats = categories.slice(0, 5);
   const hasMore = categories.length > 5;
   const fallbackBanner = CONFIG.FALLBACK_BANNER;
@@ -926,84 +951,98 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
       <h1 className="sr-only">Men's Hub – Premium Men's Fashion</h1>
       {/* Hero Banner — Responsive and adjustable */}
       <section className="relative my-6 rounded-2xl overflow-hidden h-64 md:h-96 bg-neutral-900" style={{ border: "1.5px solid var(--accent)" }}>
-        {(() => {
-          const config = parseBannerConfig(bannerImg);
-          return (
-            <>
-              {/* Desktop Banner View */}
-              <div className="hidden md:block w-full h-full relative overflow-hidden">
-                <img 
-                  src={optimizeImageUrl(config.desktop_url, 1200) || fallbackBanner} 
-                  className="w-full h-full object-cover transition-all duration-300"
-                  style={{
-                    objectPosition: `${config.desktop_x}% ${config.desktop_y}%`,
-                    transform: `scale(${config.desktop_zoom / 100})`,
-                    transformOrigin: `${config.desktop_x}% ${config.desktop_y}%`
-                  }}
-                  alt="Desktop Banner" 
-                  fetchPriority="high"
-                  decoding="async"
-                  onError={(e: any) => { e.target.src = fallbackBanner; }} 
-                />
-              </div>
-              
-              {/* Mobile Banner View */}
-              <div className="block md:hidden w-full h-full relative overflow-hidden">
-                <img 
-                  src={optimizeImageUrl(config.mobile_url, 600) || fallbackBanner} 
-                  className="w-full h-full object-cover transition-all duration-300"
-                  style={{
-                    objectPosition: `${config.mobile_x}% ${config.mobile_y}%`,
-                    transform: `scale(${config.mobile_zoom / 100})`,
-                    transformOrigin: `${config.mobile_x}% ${config.mobile_y}%`
-                  }}
-                  alt="Mobile Banner" 
-                  fetchPriority="high"
-                  decoding="async"
-                  onError={(e: any) => { e.target.src = fallbackBanner; }} 
-                />
-              </div>
-            </>
-          );
-        })()}
+        {loading ? (
+          <SkeletonBanner />
+        ) : (
+          (() => {
+            const config = parseBannerConfig(bannerImg);
+            return (
+              <>
+                {/* Desktop Banner View */}
+                <div className="hidden md:block w-full h-full relative overflow-hidden">
+                  <img 
+                    src={optimizeImageUrl(config.desktop_url, 1200) || fallbackBanner} 
+                    className="w-full h-full object-cover transition-all duration-300"
+                    style={{
+                      objectPosition: `${config.desktop_x}% ${config.desktop_y}%`,
+                      transform: `scale(${config.desktop_zoom / 100})`,
+                      transformOrigin: `${config.desktop_x}% ${config.desktop_y}%`
+                    }}
+                    alt="Desktop Banner" 
+                    fetchPriority="high"
+                    decoding="async"
+                    onError={(e: any) => { e.target.src = fallbackBanner; }} 
+                  />
+                </div>
+                
+                {/* Mobile Banner View */}
+                <div className="block md:hidden w-full h-full relative overflow-hidden">
+                  <img 
+                    src={optimizeImageUrl(config.mobile_url, 600) || fallbackBanner} 
+                    className="w-full h-full object-cover transition-all duration-300"
+                    style={{
+                      objectPosition: `${config.mobile_x}% ${config.mobile_y}%`,
+                      transform: `scale(${config.mobile_zoom / 100})`,
+                      transformOrigin: `${config.mobile_x}% ${config.mobile_y}%`
+                    }}
+                    alt="Mobile Banner" 
+                    fetchPriority="high"
+                    decoding="async"
+                    onError={(e: any) => { e.target.src = fallbackBanner; }} 
+                  />
+                </div>
+              </>
+            );
+          })()
+        )}
       </section>
 
       <section className="my-8">
         <SectionTitle>Shop By Category</SectionTitle>
         <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-          {/* First 5 real category tiles */}
-          {visibleCats.map((c: Category) => (
-            <button key={c.id} onClick={() => onCategory(c.id)} className="group">
-              <div className="aspect-square overflow-hidden rounded-xl bg-neutral-200 dark:bg-neutral-800 transition"
-                style={{ border: "1px solid var(--accent)" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
-                <img src={optimizeImageUrl(c.img, 200) || fallbackCategory} className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = fallbackCategory; }} />
-              </div>
-              <div className="mt-2 text-center text-sm uppercase tracking-wider" style={{ fontWeight: 600, color: "var(--accent)" }}>{c.name}</div>
-            </button>
-          ))}
-          {/* 6th slot — always "View All" tile */}
-          {hasMore && (
-            <button onClick={onAllCategories} className="group">
-              <div className="aspect-square overflow-hidden rounded-xl flex flex-col items-center justify-center gap-2 transition"
-                style={{ background: "var(--accent-grad)", border: "2px solid var(--accent)", boxShadow: "0 4px 24px var(--accent-glow)" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 3px var(--accent), 0 10px 40px var(--accent-glow)"; (e.currentTarget as HTMLDivElement).style.opacity = "0.88"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 24px var(--accent-glow)"; (e.currentTarget as HTMLDivElement).style.opacity = "1"; }}>
-                <ChevronRight size={28} style={{ color: "var(--accent-fg)" }} />
-                <span className="text-[11px] uppercase tracking-widest px-1 text-center" style={{ color: "var(--accent-fg)", fontWeight: 700 }}>
-                  +{categories.length - 5} More
-                </span>
-              </div>
-              <div className="mt-2 text-center text-sm uppercase tracking-wider" style={{ fontWeight: 700, color: "var(--accent)" }}>View All</div>
-            </button>
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => <SkeletonCategory key={i} />)
+          ) : (
+            <>
+              {/* First 5 real category tiles */}
+              {visibleCats.map((c: Category) => (
+                <button key={c.id} onClick={() => onCategory(c.id)} className="group">
+                  <div className="aspect-square overflow-hidden rounded-xl bg-neutral-200 dark:bg-neutral-800 transition"
+                    style={{ border: "1px solid var(--accent)" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
+                    <img src={optimizeImageUrl(c.img, 200) || fallbackCategory} className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = fallbackCategory; }} />
+                  </div>
+                  <div className="mt-2 text-center text-sm uppercase tracking-wider" style={{ fontWeight: 600, color: "var(--accent)" }}>{c.name}</div>
+                </button>
+              ))}
+              {/* 6th slot — always "View All" tile */}
+              {hasMore && (
+                <button onClick={onAllCategories} className="group">
+                  <div className="aspect-square overflow-hidden rounded-xl flex flex-col items-center justify-center gap-2 transition"
+                    style={{ background: "var(--accent-grad)", border: "2px solid var(--accent)", boxShadow: "0 4px 24px var(--accent-glow)" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 3px var(--accent), 0 10px 40px var(--accent-glow)"; (e.currentTarget as HTMLDivElement).style.opacity = "0.88"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 24px var(--accent-glow)"; (e.currentTarget as HTMLDivElement).style.opacity = "1"; }}>
+                    <ChevronRight size={28} style={{ color: "var(--accent-fg)" }} />
+                    <span className="text-[11px] uppercase tracking-widest px-1 text-center" style={{ color: "var(--accent-fg)", fontWeight: 700 }}>
+                      +{categories.length - 5} More
+                    </span>
+                  </div>
+                  <div className="mt-2 text-center text-sm uppercase tracking-wider" style={{ fontWeight: 700, color: "var(--accent)" }}>View All</div>
+                </button>
+              )}
+            </>
           )}
         </div>
       </section>
 
       <section className="my-10">
         <SectionTitle>Featured</SectionTitle>
-        {products.filter((p: Product) => p.featured).length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonProductCard key={i} />)}
+          </div>
+        ) : products.filter((p: Product) => p.featured).length === 0 ? (
           <div className="text-center py-12 text-neutral-400 text-sm">No featured products yet. Admin can mark products as featured.</div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
