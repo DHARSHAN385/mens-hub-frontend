@@ -235,26 +235,56 @@ export default function App(): React.ReactElement {
     const cachedCategories = localStorage.getItem('cachedCategories');
     const cachedBanner = localStorage.getItem('cachedBanner');
     
-    let hasCache = false;
+    let parsedProducts: Product[] = [];
+    let parsedCategories: Category[] = [];
+    
     if (cachedProducts) {
-      try { 
-        const parsed = JSON.parse(cachedProducts);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setProducts(parsed);
-          hasCache = true;
-        }
-      } catch { }
+      try { parsedProducts = JSON.parse(cachedProducts); } catch {}
     }
     if (cachedCategories) {
-      try { 
-        const parsed = JSON.parse(cachedCategories);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCategories(parsed);
-          hasCache = true;
-        }
-      } catch { }
+      try { parsedCategories = JSON.parse(cachedCategories); } catch {}
     }
-    if (cachedBanner) {
+    
+    // Names of default seeded products and categories to check/wipe from cache
+    const DEFAULT_SEED_PRODUCT_NAMES = [
+      'classic cotton t-shirt',
+      'premium formal shirt',
+      'casual striped shirt',
+      'blue denim jeans',
+      'chino pants',
+      'leather jacket',
+      'casual bomber jacket',
+      'running sneakers',
+      'classic leather shoes',
+      'aviator sunglasses',
+      'leather wallet',
+      'sports smartwatch'
+    ];
+    
+    // Check if the cached products/categories are the default seeds to prevent flash
+    const containsSeedData = 
+      parsedProducts.some((p: any) => p && typeof p.name === 'string' && DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())) ||
+      parsedCategories.some((c: any) => c && typeof c.name === 'string' && ['slides', 'sunglasses', 'sarees', 'shirt', 't-shirt', 'jeans', 'shoes', 'pants', 'jacket', 'accessories'].includes(c.name.toLowerCase()));
+      
+    if (containsSeedData) {
+      console.log("🧹 Wiping default seeded cache from localStorage to prevent flash...");
+      localStorage.removeItem('cachedProducts');
+      localStorage.removeItem('cachedCategories');
+      localStorage.removeItem('cachedBanner');
+      parsedProducts = [];
+      parsedCategories = [];
+    }
+    
+    let hasCache = false;
+    if (parsedProducts && parsedProducts.length > 0) {
+      setProducts(parsedProducts);
+      hasCache = true;
+    }
+    if (parsedCategories && parsedCategories.length > 0) {
+      setCategories(parsedCategories);
+      hasCache = true;
+    }
+    if (cachedBanner && !containsSeedData) {
       setBannerImg(cachedBanner);
     }
     
@@ -270,18 +300,27 @@ export default function App(): React.ReactElement {
           adminService.loadCategoriesFromDB(),
           adminService.loadBannerFromSettings()
         ]);
-        if (dbProducts && dbProducts.length > 0) {
-          setProducts(dbProducts);
-          localStorage.setItem('cachedProducts', JSON.stringify(dbProducts));
-        }
-        if (dbCategories && dbCategories.length > 0) {
-          setCategories(dbCategories);
-          localStorage.setItem('cachedCategories', JSON.stringify(dbCategories));
-        }
-        if (dbBanner) {
-          setBannerImg(dbBanner);
-          localStorage.setItem('cachedBanner', dbBanner);
-        }
+        
+        const freshProducts = dbProducts || [];
+        const freshCategories = dbCategories || [];
+        const freshBanner = dbBanner || "";
+        
+        // Safety check to filter out any default seed data from arriving products/categories
+        const filteredProducts = freshProducts.filter((p: any) => 
+          p && typeof p.name === 'string' && !DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())
+        );
+        const filteredCategories = freshCategories.filter((c: any) => 
+          c && typeof c.name === 'string' && !['slides', 'sunglasses', 'sarees'].includes(c.name.toLowerCase())
+        );
+        
+        setProducts(filteredProducts);
+        localStorage.setItem('cachedProducts', JSON.stringify(filteredProducts));
+        
+        setCategories(filteredCategories);
+        localStorage.setItem('cachedCategories', JSON.stringify(filteredCategories));
+        
+        setBannerImg(freshBanner);
+        localStorage.setItem('cachedBanner', freshBanner);
       } catch (err) {
         console.warn("Could not load data from database:", err);
       } finally {
@@ -328,21 +367,37 @@ export default function App(): React.ReactElement {
         adminService.loadCategoriesFromDB(true),
         adminService.loadBannerFromSettings(true)
       ]);
-      if (dbProducts && dbProducts.length > 0) {
-        setProducts(dbProducts);
-        localStorage.setItem('cachedProducts', JSON.stringify(dbProducts));
-        console.log('✅ Products refreshed from DB');
-      }
-      if (dbCategories && dbCategories.length > 0) {
-        setCategories(dbCategories);
-        localStorage.setItem('cachedCategories', JSON.stringify(dbCategories));
-        console.log('✅ Categories refreshed from DB');
-      }
-      if (dbBanner) {
-        setBannerImg(dbBanner);
-        localStorage.setItem('cachedBanner', dbBanner);
-        console.log('✅ Banner refreshed from DB');
-      }
+      
+      const freshProducts = dbProducts || [];
+      const freshCategories = dbCategories || [];
+      const freshBanner = dbBanner || "";
+      
+      // Filter out seed products and categories to ensure a completely custom experience
+      const DEFAULT_SEED_PRODUCT_NAMES = [
+        'classic cotton t-shirt', 'premium formal shirt', 'casual striped shirt',
+        'blue denim jeans', 'chino pants', 'leather jacket', 'casual bomber jacket',
+        'running sneakers', 'classic leather shoes', 'aviator sunglasses',
+        'leather wallet', 'sports smartwatch'
+      ];
+      
+      const filteredProducts = freshProducts.filter((p: any) => 
+        p && typeof p.name === 'string' && !DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())
+      );
+      const filteredCategories = freshCategories.filter((c: any) => 
+        c && typeof c.name === 'string' && !['slides', 'sunglasses', 'sarees'].includes(c.name.toLowerCase())
+      );
+      
+      setProducts(filteredProducts);
+      localStorage.setItem('cachedProducts', JSON.stringify(filteredProducts));
+      console.log('✅ Products refreshed from DB');
+      
+      setCategories(filteredCategories);
+      localStorage.setItem('cachedCategories', JSON.stringify(filteredCategories));
+      console.log('✅ Categories refreshed from DB');
+      
+      setBannerImg(freshBanner);
+      localStorage.setItem('cachedBanner', freshBanner);
+      console.log('✅ Banner refreshed from DB');
     } catch (err) {
       console.warn("Could not refresh data from database:", err);
     }
