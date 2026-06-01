@@ -33,7 +33,11 @@ const processImageUrl = (imageUrl?: string): string => {
   let result = imageUrl;
   // If it's a relative URL (starts with /), prepend backend URL
   if (imageUrl.startsWith('/')) {
-    result = `${BACKEND_URL}${imageUrl}`;
+    if (imageUrl.startsWith('/media/')) {
+      result = `https://menshub64.in${imageUrl}`;
+    } else {
+      result = `${BACKEND_URL}${imageUrl}`;
+    }
   }
   
   // Replace spaces with %20 so browsers can load them correctly without URL formatting errors
@@ -50,18 +54,10 @@ export const uploadImage = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('image', file);
 
-    // Get auth token
-    const authToken = localStorage.getItem('authToken');
-    if (!authToken) {
-      alert('You must be logged in as admin to upload images. Redirecting to login...');
-      window.location.href = '/admin-login';
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(`${BACKEND_URL}/api/admin/upload-image/`, {
+    const response = await fetch('https://menshub64.in/media/upload.php?secret=Dharshan_MensHub_Secret_2026', {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${authToken}`,
+        'X-Upload-Secret': 'Dharshan_MensHub_Secret_2026',
       },
       body: formData,
     });
@@ -69,12 +65,12 @@ export const uploadImage = async (file: File): Promise<string> => {
     if (!response.ok) {
       let error = {};
       try { error = await response.json(); } catch {}
-      alert(error['error'] || 'Failed to upload image. You may not be authenticated.');
+      alert(error['error'] || 'Failed to upload image directly to Hostinger permanent storage.');
       throw new Error(error['error'] || 'Failed to upload image');
     }
 
     const data = await response.json();
-    console.log('✅ Image uploaded successfully:', data.image_url);
+    console.log('✅ Image uploaded successfully to Hostinger:', data.image_url);
     clearCache(); // Invalidate cache after upload/change
     return processImageUrl(data.image_url);
   } catch (error: any) {

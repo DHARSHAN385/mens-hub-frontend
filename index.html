@@ -3,10 +3,53 @@
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
+      <link rel="icon" type="image/png" href="/favicon.png" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>mens hub front end</title>
+      <meta name="theme-color" content="#1e3a8a" />
+      <title>Men's Hub – Premium Men's Fashion</title>
+      <meta name="description" content="Men's Hub offers premium men's fashion, clothing, accessories, and lifestyle products. Shop the latest trends with confidence.">
+      <meta name="keywords" content="men's fashion, premium clothing, menswear, accessories, online store">
+      <meta name="robots" content="index, follow">
+      <meta property="og:title" content="Men's Hub – Premium Men's Fashion" />
+      <meta property="og:description" content="Shop premium men's fashion, clothing, and accessories at Men's Hub." />
+      <meta property="og:url" content="https://menshub64.in" />
+      <meta property="og:type" content="website" />
+
+      <!-- Preconnect to speed up backend API and Hostinger media -->
+      <link rel="preconnect" href="https://mens-hub-backend.onrender.com" crossorigin />
+      <link rel="preconnect" href="https://menshub64.in" />
+      <link rel="dns-prefetch" href="https://images.unsplash.com" />
+
       <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-      <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+      
+      <!-- E-commerce Online Store Schema Structured Data for Google/SEO -->
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "OnlineStore",
+        "@id": "https://menshub64.in/#website",
+        "name": "Men's Hub",
+        "url": "https://menshub64.in",
+        "logo": "https://menshub64.in/favicon.png",
+        "description": "Men's Hub offers premium men's fashion, clothing, accessories, and lifestyle products.",
+        "telephone": "+919524097865",
+        "email": "menshubadmin01@gmail.com",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "13, Aruppukottai Main Rd, South Gate, Mahalipatti",
+          "addressLocality": "Madurai",
+          "addressRegion": "Tamil Nadu",
+          "postalCode": "625001",
+          "addressCountry": "IN"
+        },
+        "sameAs": [
+          "https://www.instagram.com/mens_hub_clothing?igsh=cTJraHF5dG52eDky"
+        ]
+      }
+      </script>
+
+      <!-- Load Cashfree SDK deferred so it does not block page render -->
+      <script src="https://sdk.cashfree.com/js/v3/cashfree.js" defer></script>
     </head>
 
     <body>

@@ -34,9 +34,11 @@ import { GoogleLogin } from "../components/GoogleLogin";
 import { AuthForm } from "../components/AuthForm";
 import { AdminOrderNotificationCenter } from "../components/AdminOrderNotificationCenter";
 import adminService from "../services/adminService";
+import AboutUs from "./pages/AboutUs";
+import Policies from "./pages/Policies";
 import {
   Search, ShoppingBag, User, Heart, Home, Grid3x3, Package,
-  Menu, X, Plus, Minus, Trash2, ChevronRight, MapPin, Phone,
+  Menu, X, Plus, Minus, Trash2, ChevronRight, MapPin, Phone, Mail,
   Instagram, ChevronLeft, Star, Filter, Check,
   Bell, Upload, Edit2, ImageIcon, ShoppingCart, Package2, Sun, Moon, Eye, EyeOff,
   Truck,
@@ -61,7 +63,8 @@ type Page =
   | { name: "cart" } | { name: "checkout"; directItem?: CartItem } | { name: "login" }
   | { name: "wishlist" } | { name: "orders" }
   | { name: "admin"; initialTab?: string; initialOrderId?: any }
-  | { name: "notifications" } | { name: "allproducts" };
+  | { name: "notifications" } | { name: "allproducts" }
+  | { name: "aboutus" } | { name: "policies" };
 
 /* ─────────────────── Utility ─────────────────── */
 export interface BannerConfig {
@@ -81,9 +84,25 @@ function absoluteUrl(url?: string): string {
   if (!url) return '';
   let result = url;
   if (url.startsWith('/')) {
-    result = `${BACKEND_URL}${url}`;
+    if (url.startsWith('/media/')) {
+      result = `https://menshub64.in${url}`;
+    } else {
+      result = `${BACKEND_URL}${url}`;
+    }
   }
   return result.replace(/ /g, '%20');
+}
+
+export function optimizeImageUrl(url: string, width: number): string {
+  if (!url) return '';
+  let result = absoluteUrl(url);
+  if (result.includes('images.unsplash.com')) {
+    const separator = result.includes('?') ? '&' : '?';
+    if (!result.includes('w=')) {
+      result = `${result}${separator}w=${width}&q=80&auto=format&fit=crop`;
+    }
+  }
+  return result;
 }
 
 export function parseBannerConfig(bannerData?: string): BannerConfig {
@@ -392,7 +411,7 @@ export default function App(): React.ReactElement {
     return (
       <div className={`min-h-screen w-full flex flex-col items-center justify-center ${dark ? "bg-neutral-950 text-neutral-100" : "bg-neutral-50 text-neutral-900"}`} style={accentVars}>
         <div className="flex flex-col items-center gap-4">
-          <img src={logoImg} alt="Men's Hub" className="h-16 w-16 rounded-xl object-cover object-top animate-pulse" style={{ boxShadow: "0 0 0 2.5px var(--accent), 0 4px 20px var(--accent-glow)" }} />
+          <img src={logoImg} alt="Men's Hub" width="64" height="64" className="h-16 w-16 rounded-xl object-cover object-top animate-pulse" style={{ boxShadow: "0 0 0 2.5px var(--accent), 0 4px 20px var(--accent-glow)" }} />
           <div className="flex flex-col items-center leading-none">
             <span className="tracking-[0.25em] uppercase text-lg" style={{ fontWeight: 700, color: "var(--accent)" }}>Men's Hub</span>
             <span className="text-xs tracking-widest uppercase mt-1.5" style={{ color: "var(--accent-soft)", opacity: 0.85 }}>Be Your Own Label</span>
@@ -535,9 +554,15 @@ export default function App(): React.ReactElement {
             initialOrderId={(page as any).initialOrderId}
             onBack={() => { refreshDataFromDB(); back(); }} />
         )}
+        {page.name === "aboutus" && (
+          <AboutUs onBack={back} />
+        )}
+        {page.name === "policies" && (
+          <Policies onBack={back} />
+        )}
       </main>
 
-      <Footer />
+      <Footer onNavigate={navigate} />
       <BottomNav
         active={page.name}
         onHome={() => navigate({ name: "home" })}
@@ -566,13 +591,14 @@ function ProfileItem({ children, onClick }: any) {
   );
 }
 
-function IconBtn({ children, onClick, className = "" }: any) {
+function IconBtn({ children, onClick, className = "", ...rest }: any) {
   return (
     <button onClick={onClick}
       className={`relative w-9 h-9 rounded-md flex items-center justify-center transition ${className}`}
       style={{ border: "1px solid var(--accent)", color: "var(--accent-soft)" }}
       onMouseEnter={e => { e.currentTarget.style.background = "var(--accent-grad)"; e.currentTarget.style.color = "var(--accent-fg)"; }}
-      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--accent-soft)"; }}>
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--accent-soft)"; }}
+      {...rest}>
       {children}
     </button>
   );
@@ -610,11 +636,11 @@ function TopBar(props: any) {
     <header className="sticky top-0 z-40 bg-white/90 dark:bg-neutral-950/90 backdrop-blur border-b border-neutral-200 dark:border-neutral-800 relative">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-3">
         {/* Mobile hamburger */}
-        <button className="md:hidden p-2 -ml-2" onClick={() => setMenuOpen(true)}><Menu size={22} /></button>
+        <button className="md:hidden p-2 -ml-2" onClick={() => setMenuOpen(true)} aria-label="Open navigation menu"><Menu size={22} /></button>
 
         {/* Logo */}
-        <button onClick={props.onLogo} className="flex items-center gap-2 group shrink-0">
-          <img src={logoImg} alt="Men's Hub" className="h-11 w-11 rounded-lg object-cover object-top" style={{ boxShadow: "0 0 0 1.5px var(--accent)" }} />
+        <button onClick={props.onLogo} className="flex items-center gap-2 group shrink-0" aria-label="Men's Hub Home">
+          <img src={logoImg} alt="Men's Hub" width="44" height="44" className="h-11 w-11 rounded-lg object-cover object-top" style={{ boxShadow: "0 0 0 1.5px var(--accent)" }} />
           <div className="flex flex-col leading-none">
             <span className="tracking-[0.25em] uppercase" style={{ fontWeight: 700, color: "var(--accent)" }}>Men's Hub</span>
             <span className="text-[10px] tracking-widest uppercase" style={{ color: "var(--accent-soft)", opacity: 0.85 }}>Be Your Own Label</span>
@@ -673,7 +699,7 @@ function TopBar(props: any) {
 
         {/* Desktop search bar */}
         <div className="hidden md:flex flex-1 max-w-xs mx-auto">
-          <button onClick={props.onSearch} className="w-full flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-300 dark:border-neutral-700 text-neutral-500 hover:border-neutral-900 dark:hover:border-white transition">
+          <button onClick={props.onSearch} className="w-full flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-900 dark:hover:border-white transition" aria-label="Search products">
             <Search size={16} /> <span className="text-sm">Search...</span>
           </button>
         </div>
@@ -681,21 +707,21 @@ function TopBar(props: any) {
         {/* Right icons */}
         <div className="flex items-center gap-2 ml-auto">
           {/* Dark mode — desktop */}
-          <IconBtn onClick={props.toggleDark} className="hidden md:inline-flex">
+          <IconBtn onClick={props.toggleDark} className="hidden md:inline-flex" aria-label="Toggle dark mode">
             <span style={{ fontSize: 14 }}>{dark ? "☀" : "☾"}</span>
           </IconBtn>
 
           {/* Search — mobile */}
-          <IconBtn onClick={props.onSearch} className="md:hidden"><Search size={18} /></IconBtn>
+          <IconBtn onClick={props.onSearch} className="md:hidden" aria-label="Search products"><Search size={18} /></IconBtn>
 
           {/* Wishlist — desktop */}
-          <IconBtn onClick={props.onWishlist} className="hidden md:inline-flex">
+          <IconBtn onClick={props.onWishlist} className="hidden md:inline-flex" aria-label="View wishlist">
             <Heart size={18} />
           </IconBtn>
 
           {user?.isAdmin && (
             <div className="relative flex items-center justify-center">
-              <IconBtn onClick={props.onNotifications} className="hidden md:inline-flex">
+              <IconBtn onClick={props.onNotifications} className="hidden md:inline-flex" aria-label="View notifications">
                 <Bell size={18} />
                 {props.unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 text-[10px] rounded-full w-4 h-4 flex items-center justify-center"
@@ -707,7 +733,7 @@ function TopBar(props: any) {
 
           {/* Profile dropdown */}
           <div className="relative">
-            <IconBtn onClick={() => setProfileOpen((o: boolean) => !o)}><User size={18} /></IconBtn>
+            <IconBtn onClick={() => setProfileOpen((o: boolean) => !o)} aria-label="Toggle user menu"><User size={18} /></IconBtn>
             {profileOpen && (
               <>
                 <div className="fixed inset-0 z-[100]" onClick={() => setProfileOpen(false)} />
@@ -752,7 +778,7 @@ function TopBar(props: any) {
           </div>
 
           {/* Cart */}
-          <IconBtn onClick={props.onCart} className="hidden md:inline-flex">
+          <IconBtn onClick={props.onCart} className="hidden md:inline-flex" aria-label="View shopping cart">
             <ShoppingBag size={18} />
             {props.cartCount > 0 && (
               <span className="absolute -top-1 -right-1 text-[10px] rounded-full w-4 h-4 flex items-center justify-center"
@@ -814,7 +840,7 @@ function SearchOverlay({ products, onClose, onSelect, onSearch }: any) {
           <Search size={20} />
           <input autoFocus value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && onSearch(q)}
             placeholder="Search shirts, jeans, shoes..." className="flex-1 bg-transparent outline-none" />
-          <button onClick={onClose}><X size={20} /></button>
+          <button onClick={onClose} aria-label="Close search overlay"><X size={20} /></button>
         </div>
         <div className="mt-3">
           {q && suggestions.length === 0 && <div className="py-8 text-center text-neutral-500">No products found</div>}
@@ -841,6 +867,8 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
 
   return (
     <div className="max-w-7xl mx-auto px-4">
+      {/* Visually hidden h1 for SEO and heading structure outline */}
+      <h1 className="sr-only">Men's Hub – Premium Men's Fashion</h1>
       {/* Hero Banner — Responsive and adjustable */}
       <section className="relative my-6 rounded-2xl overflow-hidden h-64 md:h-96 bg-neutral-900" style={{ border: "1.5px solid var(--accent)" }}>
         {(() => {
@@ -850,7 +878,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
               {/* Desktop Banner View */}
               <div className="hidden md:block w-full h-full relative overflow-hidden">
                 <img 
-                  src={config.desktop_url || fallbackBanner} 
+                  src={optimizeImageUrl(config.desktop_url, 1200) || fallbackBanner} 
                   className="w-full h-full object-cover transition-all duration-300"
                   style={{
                     objectPosition: `${config.desktop_x}% ${config.desktop_y}%`,
@@ -858,6 +886,8 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                     transformOrigin: `${config.desktop_x}% ${config.desktop_y}%`
                   }}
                   alt="Desktop Banner" 
+                  fetchPriority="high"
+                  decoding="async"
                   onError={(e: any) => { e.target.src = fallbackBanner; }} 
                 />
               </div>
@@ -865,7 +895,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
               {/* Mobile Banner View */}
               <div className="block md:hidden w-full h-full relative overflow-hidden">
                 <img 
-                  src={config.mobile_url || fallbackBanner} 
+                  src={optimizeImageUrl(config.mobile_url, 600) || fallbackBanner} 
                   className="w-full h-full object-cover transition-all duration-300"
                   style={{
                     objectPosition: `${config.mobile_x}% ${config.mobile_y}%`,
@@ -873,6 +903,8 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                     transformOrigin: `${config.mobile_x}% ${config.mobile_y}%`
                   }}
                   alt="Mobile Banner" 
+                  fetchPriority="high"
+                  decoding="async"
                   onError={(e: any) => { e.target.src = fallbackBanner; }} 
                 />
               </div>
@@ -891,7 +923,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                 style={{ border: "1px solid var(--accent)" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
-                <img src={c.img || fallbackCategory} className="w-full h-full object-cover group-hover:scale-105 transition" onError={(e: any) => { e.target.src = fallbackCategory; }} />
+                <img src={optimizeImageUrl(c.img, 200) || fallbackCategory} className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = fallbackCategory; }} />
               </div>
               <div className="mt-2 text-center text-sm uppercase tracking-wider" style={{ fontWeight: 600, color: "var(--accent)" }}>{c.name}</div>
             </button>
@@ -937,7 +969,7 @@ function CategoriesPage({ categories, onCategory, onBack }: any) {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2" aria-label="Go back"><ChevronLeft size={20} /></button>
         <h2 className="uppercase tracking-[0.2em]" style={{ fontWeight: 600 }}>All Categories</h2>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -947,7 +979,7 @@ function CategoriesPage({ categories, onCategory, onBack }: any) {
             style={{ border: "1px solid var(--accent)" }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 0 1px var(--accent)"; }}>
-            <img src={c.img || fallbackCategory} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition" onError={(e: any) => { e.target.src = fallbackCategory; }} />
+            <img src={optimizeImageUrl(c.img, 400) || fallbackCategory} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = fallbackCategory; }} />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
             <div className="absolute bottom-3 left-3 right-3 text-white uppercase tracking-[0.2em]" style={{ fontWeight: 600 }}>{c.name}</div>
           </button>
@@ -963,7 +995,7 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist }: any) {
   const isOneSize = product.sizes.length === 1 && product.sizes[0] === "One";
   const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] ?? "");
   const fallbackProduct = CONFIG.FALLBACK_PRODUCT;
-  const productImage = product.image_url || product.images?.[0] || '';
+  const productImage = optimizeImageUrl(product.image_url || product.images?.[0] || '', 300);
 
   return (
     <div className="group p-2 rounded-xl transition flex flex-col" style={{ border: "1px solid var(--accent)" }}
@@ -971,10 +1003,11 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist }: any) {
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
       {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900 cursor-pointer" onClick={() => onProduct(product.id)}>
-        <img src={productImage || fallbackProduct} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" onError={(e: any) => { e.target.src = fallbackProduct; }} />
+        <img src={productImage || fallbackProduct} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy" decoding="async" alt={product.name} onError={(e: any) => { e.target.src = fallbackProduct; }} />
         <button onClick={e => { e.stopPropagation(); onWish(product.id); }}
           className="absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}>
+          style={{ background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}
+          aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}>
           <Heart size={16} className={wished ? "fill-red-500 text-red-500" : ""} style={{ color: wished ? undefined : "var(--accent-soft)" }} />
         </button>
       </div>
@@ -1049,7 +1082,7 @@ function ListingPage({ title, products, onProduct, onBuy, onWish, wishlist, onBa
   return (
     <div className="max-w-7xl mx-auto px-4">
       <div className="flex items-center gap-3 my-4">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2" aria-label="Go back"><ChevronLeft size={20} /></button>
         <h2 className="uppercase tracking-[0.2em]">{title}</h2>
       </div>
       <div className="sticky top-16 z-20 bg-white/90 dark:bg-neutral-950/90 backdrop-blur py-3 border-b border-neutral-200 dark:border-neutral-800 flex flex-wrap items-center gap-3">
@@ -1105,7 +1138,7 @@ function AllProductsPage({ products, categories, onProduct, onBuy, onWish, wishl
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2" aria-label="Go back"><ChevronLeft size={20} /></button>
         <div>
           <h2 className="uppercase tracking-[0.2em]" style={{ fontWeight: 700 }}>All Products</h2>
           <p className="text-xs mt-0.5" style={{ color: "var(--accent-soft)", opacity: 0.7 }}>
@@ -1183,8 +1216,8 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack }: any) {
             <img src={displayImages[imgIdx]} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" onError={(e: any) => { e.target.src = fallbackProduct; }} />
             {displayImages.length > 1 && (
               <>
-                <button onClick={() => setImgIdx((imgIdx - 1 + displayImages.length) % displayImages.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 dark:bg-neutral-900/90 flex items-center justify-center"><ChevronLeft size={18} /></button>
-                <button onClick={() => setImgIdx((imgIdx + 1) % displayImages.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 dark:bg-neutral-900/90 flex items-center justify-center"><ChevronRight size={18} /></button>
+                <button onClick={() => setImgIdx((imgIdx - 1 + displayImages.length) % displayImages.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 dark:bg-neutral-900/90 flex items-center justify-center" aria-label="Previous image"><ChevronLeft size={18} /></button>
+                <button onClick={() => setImgIdx((imgIdx + 1) % displayImages.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 dark:bg-neutral-900/90 flex items-center justify-center" aria-label="Next image"><ChevronRight size={18} /></button>
               </>
             )}
           </div>
@@ -1216,7 +1249,7 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack }: any) {
           <div className="flex gap-3 mt-8">
             <button onClick={() => onBuy(product, size)} className="flex-1 py-3 uppercase tracking-wider text-sm rounded-md"
               style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>Buy Now</button>
-            <button onClick={() => onWish(product.id)} className="px-4 border border-neutral-300 dark:border-neutral-700">
+            <button onClick={() => onWish(product.id)} className="px-4 border border-neutral-300 dark:border-neutral-700" aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}>
               <Heart size={20} className={wished ? "fill-red-500 text-red-500" : ""} />
             </button>
           </div>
@@ -1248,7 +1281,7 @@ function CartPage({ cart, setCart, onCheckout, onBack, total }: any) {
   return (
     <div className="max-w-4xl mx-auto px-4">
       <div className="flex items-center gap-3 my-4">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2" aria-label="Go back"><ChevronLeft size={20} /></button>
         <h2 className="uppercase tracking-[0.2em]">Cart ({cart.length})</h2>
       </div>
       <div className="space-y-3">
@@ -1264,11 +1297,11 @@ function CartPage({ cart, setCart, onCheckout, onBack, total }: any) {
                 <div className="mt-1">₹{(item.product.price * item.qty).toLocaleString()}</div>
               </div>
               <div className="flex flex-col items-end justify-between">
-                <button onClick={() => update(i, 0)}><Trash2 size={16} className="text-neutral-500" /></button>
+                <button onClick={() => update(i, 0)} aria-label="Remove item from cart"><Trash2 size={16} className="text-neutral-500" /></button>
                 <div className="flex items-center gap-1 border border-neutral-300 dark:border-neutral-700 rounded-full">
-                  <button onClick={() => update(i, item.qty - 1)} className="w-7 h-7 flex items-center justify-center"><Minus size={12} /></button>
+                  <button onClick={() => update(i, item.qty - 1)} className="w-7 h-7 flex items-center justify-center" aria-label="Decrease quantity"><Minus size={12} /></button>
                   <span className="w-6 text-center text-sm">{item.qty}</span>
-                  <button onClick={() => update(i, item.qty + 1)} className="w-7 h-7 flex items-center justify-center"><Plus size={12} /></button>
+                  <button onClick={() => update(i, item.qty + 1)} className="w-7 h-7 flex items-center justify-center" aria-label="Increase quantity"><Plus size={12} /></button>
                 </div>
               </div>
             </div>
@@ -1459,7 +1492,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
   return (
     <div className="max-w-2xl mx-auto px-4">
       <div className="flex items-center gap-3 my-4">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2" aria-label="Go back"><ChevronLeft size={20} /></button>
         <h2 className="uppercase tracking-[0.2em]">Checkout</h2>
       </div>
       <div className="flex gap-2 mb-6">
@@ -1663,7 +1696,7 @@ function WishlistPage({ products, onProduct, onBuy, onWish, wishlist, onBack }: 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="flex items-center gap-3 mb-2">
-        <button onClick={onBack} className="p-2 -ml-2 rounded-lg transition" style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2 rounded-lg transition" style={{ border: "1px solid var(--accent)", color: "var(--accent)" }} aria-label="Go back"><ChevronLeft size={20} /></button>
         <div>
           <h2 className="uppercase tracking-[0.2em]" style={{ fontWeight: 700 }}>My Wishlist</h2>
           <p className="text-sm text-neutral-500 mt-0.5">{products.length === 0 ? "No saved items" : `${products.length} item${products.length > 1 ? "s" : ""} saved`}</p>
@@ -1891,7 +1924,7 @@ function OrdersPage({ user, onBack }: any) {
     return (
       <div className="max-w-3xl mx-auto px-4">
         <div className="flex items-center gap-3 my-4">
-          <button onClick={() => setSelectedOrder(null)} className="p-2 -ml-2"><ChevronLeft size={20} /></button>
+          <button onClick={() => setSelectedOrder(null)} className="p-2 -ml-2" aria-label="Back to orders list"><ChevronLeft size={20} /></button>
           <h2 className="uppercase tracking-[0.2em]">Order Details</h2>
         </div>
 
@@ -2151,7 +2184,7 @@ function OrdersPage({ user, onBack }: any) {
   return (
     <div className="max-w-3xl mx-auto px-4">
       <div className="flex items-center gap-3 my-4">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2" aria-label="Go back"><ChevronLeft size={20} /></button>
         <h2 className="uppercase tracking-[0.2em]">My Orders</h2>
       </div>
       <div className="mb-4 text-sm text-neutral-500">Welcome, {user?.name || "Guest"}</div>
@@ -2307,7 +2340,7 @@ function NotificationsPage({ onBack }: any) {
     <div className="max-w-3xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-2">
-        <button onClick={onBack} className="p-2 -ml-2 rounded-lg transition" style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2 rounded-lg transition" style={{ border: "1px solid var(--accent)", color: "var(--accent)" }} aria-label="Go back"><ChevronLeft size={20} /></button>
         <div className="flex-1">
           <h2 className="uppercase tracking-[0.2em] flex items-center gap-2" style={{ fontWeight: 700 }}>
             <Bell size={20} style={{ color: "var(--accent)" }} /> Order Notifications
@@ -2713,7 +2746,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
   return (
     <div className="max-w-5xl mx-auto px-4">
       <div className="flex items-center gap-3 my-4">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft size={20} /></button>
+        <button onClick={onBack} className="p-2 -ml-2" aria-label="Go back"><ChevronLeft size={20} /></button>
         <h2 className="uppercase tracking-[0.2em]">Admin Panel</h2>
         {dataLoading && <span className="text-xs text-neutral-500 animate-pulse">📡 Loading data...</span>}
       </div>
@@ -3377,7 +3410,7 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
     setUploading(true);
     try {
       const uploadedUrl = await adminService.uploadImage(file);
-      setP((prev: Product) => ({ ...prev, images: [uploadedUrl] }));
+      setP((prev: Product) => ({ ...prev, image_url: uploadedUrl, images: [uploadedUrl] }));
       toast.success("✅ Image uploaded successfully");
     } catch (error: any) {
       console.error("❌ Image upload failed:", error);
@@ -3390,8 +3423,10 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
 
   const handleSave = () => {
     setSaving(true);
-    const img = p.images?.[0] || preview || p.image_url || "";
-    onSave({ ...p, images: [img] });
+    const img = p.images?.[0] || p.image_url || preview || "";
+    // Avoid saving base64 representations to database
+    const finalImg = img.startsWith('data:image/') ? '' : img;
+    onSave({ ...p, image_url: finalImg, images: [finalImg] });
     // Reset saving state after save completes
     setTimeout(() => setSaving(false), 500);
   };
@@ -3537,7 +3572,9 @@ function CategoryEditor({ category, onSave, onCancel, notifyTabsToRefresh }: any
   const handleSave = () => {
     setSaving(true);
     const img = c.img || imageUrl || preview || '';
-    onSave({ ...c, img });
+    // Avoid saving base64 representations to database
+    const finalImg = img.startsWith('data:image/') ? '' : img;
+    onSave({ ...c, img: finalImg });
     // Reset saving state after save completes
     setTimeout(() => setSaving(false), 500);
   };
@@ -3868,7 +3905,7 @@ function BannerEditor({ bannerImg, setBannerImg, notifyTabsToRefresh }: any) {
 }
 
 /* ─────────────────── Footer ─────────────────── */
-function Footer() {
+function Footer({ onNavigate }: any) {
   return (
     <footer className="bg-neutral-100 dark:bg-neutral-900 mt-12 py-10 px-4">
       <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
@@ -3881,14 +3918,17 @@ function Footer() {
             Style that defines confidence.</p>
         </div>
         <div>
-          <h4 className="uppercase tracking-wider mb-3">Customer Care</h4>
-          <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <h3 className="uppercase tracking-wider mb-3 font-semibold text-neutral-800 dark:text-neutral-200">Customer Care</h3>
+          <div className="space-y-2 text-sm text-neutral-700 dark:text-neutral-300">
+            <button onClick={() => onNavigate({ name: "aboutus" })} className="hover:underline cursor-pointer text-left block text-neutral-700 dark:text-neutral-300">About Us</button>
+            <button onClick={() => onNavigate({ name: "policies" })} className="hover:underline cursor-pointer text-left block text-neutral-700 dark:text-neutral-300">Policies</button>
             <a href={CONFIG.MAPS_URL} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 hover:underline cursor-pointer"><MapPin size={14} className="mt-0.5 shrink-0" /> 13, Aruppukottai Main Rd, South Gate, Mahalipatti, Madurai, Tamil Nadu 625001, India</a>
             <a href="tel:+919524097865" className="flex items-center gap-2 hover:underline"><Phone size={14} className="shrink-0" /> +91 95240 97865</a>
+            <a href="mailto:menshubadmin01@gmail.com" className="flex items-center gap-2 hover:underline"><Mail size={14} className="shrink-0" /> menshubadmin01@gmail.com</a>
           </div>
         </div>
         <div>
-          <h4 className="uppercase tracking-wider mb-3">Follow</h4>
+          <h3 className="uppercase tracking-wider mb-3 font-semibold text-neutral-800 dark:text-neutral-200">Follow</h3>
           <div className="flex gap-3">
             <a
               href={CONFIG.INSTAGRAM_URL}
@@ -3917,7 +3957,7 @@ function Footer() {
           </div>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-800 text-xs text-neutral-500 text-center">© 2026 Men's Hub. All rights reserved.</div>
+      <div className="max-w-7xl mx-auto mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 text-center">© 2026 Men's Hub. All rights reserved.</div>
     </footer>
   );
 }
@@ -3940,6 +3980,7 @@ function BottomNav({ active, onHome, onCategories, onWishlist, onCart, onOrders,
         return (
           <button key={it.key} onClick={it.action}
             className="flex-1 py-1.5 flex flex-col items-center gap-0.5 rounded-lg transition active:scale-95 relative"
+            aria-label={it.label}
             style={{
               border: "1px solid var(--accent)",
               background: isActive ? "var(--accent-grad)" : "transparent",

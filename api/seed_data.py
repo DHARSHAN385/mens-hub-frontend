@@ -8,6 +8,11 @@ from api.models import Category, Product, Banner
 def seed_data():
     """Insert initial seed data into database."""
     
+    # Do not seed if database already has categories or products to prevent recreating deleted items
+    if Category.objects.exists() or Product.objects.exists():
+        print("Database already has categories or products. Skipping seeding.")
+        return
+    
     # Clear existing data (optional - comment out to preserve)
     # Category.objects.all().delete()
     # Product.objects.all().delete()

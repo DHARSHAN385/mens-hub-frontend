@@ -8,6 +8,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         """Insert initial seed data into database."""
         
+        # Do not seed if database already has categories or products to prevent recreating deleted items
+        if Category.objects.exists() or Product.objects.exists():
+            self.stdout.write(self.style.WARNING("Database already has categories or products. Skipping seeding."))
+            return
+            
         self.stdout.write("Starting seed data insertion...")
         
         # Create Categories
