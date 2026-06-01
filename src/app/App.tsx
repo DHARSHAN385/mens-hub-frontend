@@ -189,6 +189,40 @@ function fileToDataURL(file: File): Promise<string> {
   return new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target?.result as string); r.readAsDataURL(file); });
 }
 
+/* ─────────────────── Seed Data Constants ─────────────────── */
+const DEFAULT_SEED_PRODUCT_NAMES = [
+  'classic cotton t-shirt',
+  'premium formal shirt',
+  'casual striped shirt',
+  'blue denim jeans',
+  'chino pants',
+  'leather jacket',
+  'casual bomber jacket',
+  'running sneakers',
+  'formal dress shoes',
+  'classic leather shoes',
+  'casual slip-ons',
+  'leather belt',
+  'wool scarf',
+  'aviator sunglasses',
+  'leather wallet',
+  'sports smartwatch'
+];
+
+const DEFAULT_SEED_CATEGORY_NAMES = [
+  'shirt',
+  't-shirt',
+  'jeans',
+  'slides',
+  'shoes',
+  'sunglasses',
+  'pants',
+  'jacket',
+  'accessories',
+  'sarees'
+];
+
+
 /* ══════════════════════���════════════════════════
    APP ROOT
 ═══════════════════════════════════════════════ */
@@ -267,26 +301,10 @@ export default function App(): React.ReactElement {
       try { parsedCategories = JSON.parse(cachedCategories); } catch {}
     }
     
-    // Names of default seeded products and categories to check/wipe from cache
-    const DEFAULT_SEED_PRODUCT_NAMES = [
-      'classic cotton t-shirt',
-      'premium formal shirt',
-      'casual striped shirt',
-      'blue denim jeans',
-      'chino pants',
-      'leather jacket',
-      'casual bomber jacket',
-      'running sneakers',
-      'classic leather shoes',
-      'aviator sunglasses',
-      'leather wallet',
-      'sports smartwatch'
-    ];
-    
     // Check if the cached products/categories are the default seeds to prevent flash
     const containsSeedData = 
       parsedProducts.some((p: any) => p && typeof p.name === 'string' && DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())) ||
-      parsedCategories.some((c: any) => c && typeof c.name === 'string' && ['slides', 'sunglasses', 'sarees', 'shirt', 't-shirt', 'jeans', 'shoes', 'pants', 'jacket', 'accessories'].includes(c.name.toLowerCase()));
+      parsedCategories.some((c: any) => c && typeof c.name === 'string' && DEFAULT_SEED_CATEGORY_NAMES.includes(c.name.toLowerCase()));
       
     if (containsSeedData) {
       console.log("🧹 Wiping default seeded cache from localStorage to prevent flash...");
@@ -335,7 +353,7 @@ export default function App(): React.ReactElement {
           p && typeof p.name === 'string' && !DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())
         );
         const filteredCategories = freshCategories.filter((c: any) => 
-          c && typeof c.name === 'string' && !['slides', 'sunglasses', 'sarees'].includes(c.name.toLowerCase())
+          c && typeof c.name === 'string' && !DEFAULT_SEED_CATEGORY_NAMES.includes(c.name.toLowerCase())
         );
         
         setProducts(filteredProducts);
@@ -402,18 +420,11 @@ export default function App(): React.ReactElement {
       const freshBanner = dbBanner || "";
       
       // Filter out seed products and categories to ensure a completely custom experience
-      const DEFAULT_SEED_PRODUCT_NAMES = [
-        'classic cotton t-shirt', 'premium formal shirt', 'casual striped shirt',
-        'blue denim jeans', 'chino pants', 'leather jacket', 'casual bomber jacket',
-        'running sneakers', 'classic leather shoes', 'aviator sunglasses',
-        'leather wallet', 'sports smartwatch'
-      ];
-      
       const filteredProducts = freshProducts.filter((p: any) => 
         p && typeof p.name === 'string' && !DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())
       );
       const filteredCategories = freshCategories.filter((c: any) => 
-        c && typeof c.name === 'string' && !['slides', 'sunglasses', 'sarees'].includes(c.name.toLowerCase())
+        c && typeof c.name === 'string' && !DEFAULT_SEED_CATEGORY_NAMES.includes(c.name.toLowerCase())
       );
       
       setProducts(filteredProducts);
