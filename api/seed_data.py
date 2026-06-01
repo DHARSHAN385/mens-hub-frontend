@@ -126,7 +126,7 @@ def seed_data():
             'category': 'jacket',
             'image_url': 'https://images.unsplash.com/photo-1551028719-00167b16ebc5?w=400',
             'category_image': 'https://images.unsplash.com/photo-1551028719-00167b16ebc5?w=200',
-            'banner_image': 'https://images.unsplash.com/photo-1578921049066-f845f67c53e8?w=800',
+            'banner_image': 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=800',
             'stock': 30,
             'sizes': ['S', 'M', 'L', 'XL'],
             'popularity': 88,
@@ -250,7 +250,7 @@ def seed_data():
             'is_active': True,
         },
         {
-            'image_url': 'https://images.unsplash.com/photo-1578921049066-f845f67c53e8?w=1200',
+            'image_url': 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200',
             'title': 'New Arrivals',
             'description': 'Fresh styles just arrived',
             'is_active': True,

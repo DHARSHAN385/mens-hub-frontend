@@ -228,7 +228,7 @@ class Command(BaseCommand):
                 'is_active': True,
             },
             {
-                'image_url': 'https://images.unsplash.com/photo-1578921049066-f845f67c53e8?w=1200',
+                'image_url': 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200',
                 'title': 'New Arrivals',
                 'description': 'Fresh styles just arrived',
                 'is_active': True,

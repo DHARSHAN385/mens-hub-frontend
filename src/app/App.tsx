@@ -97,10 +97,31 @@ function absoluteUrl(url?: string): string {
 export function optimizeImageUrl(url: string, width: number): string {
   if (!url) return '';
   let result = absoluteUrl(url);
+  
+  // Intercept the known 404 seed banner URL and use a valid fallback instead
+  if (result.includes('photo-1578921049066-f845f67c53e8')) {
+    result = CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200';
+  }
+
   if (result.includes('images.unsplash.com')) {
-    const separator = result.includes('?') ? '&' : '?';
-    if (!result.includes('w=')) {
-      result = `${result}${separator}w=${width}&q=80&auto=format&fit=crop`;
+    try {
+      const urlObj = new URL(result);
+      urlObj.searchParams.set('w', width.toString());
+      // auto=format ensures WebP/AVIF format optimization
+      urlObj.searchParams.set('auto', 'format');
+      // q=75 offers excellent compression with virtually no visible quality loss
+      urlObj.searchParams.set('q', '75');
+      if (!urlObj.searchParams.has('fit')) {
+        urlObj.searchParams.set('fit', 'crop');
+      }
+      result = urlObj.toString();
+    } catch (e) {
+      if (result.includes('w=')) {
+        result = result.replace(/w=\d+/, `w=${width}`);
+      } else {
+        const separator = result.includes('?') ? '&' : '?';
+        result = `${result}${separator}w=${width}&q=75&auto=format&fit=crop`;
+      }
     }
   }
   return result;
@@ -286,7 +307,10 @@ export default function App(): React.ReactElement {
       hasCache = true;
     }
     if (cachedBanner && !containsSeedData) {
-      setBannerImg(cachedBanner);
+      const sanitizedCachedBanner = cachedBanner.includes('photo-1578921049066-f845f67c53e8')
+        ? (CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200')
+        : cachedBanner;
+      setBannerImg(sanitizedCachedBanner);
     }
     
     if (hasCache) {
@@ -320,8 +344,12 @@ export default function App(): React.ReactElement {
         setCategories(filteredCategories);
         localStorage.setItem('cachedCategories', JSON.stringify(filteredCategories));
         
-        setBannerImg(freshBanner);
-        localStorage.setItem('cachedBanner', freshBanner);
+        const sanitizedBanner = freshBanner.includes('photo-1578921049066-f845f67c53e8')
+          ? (CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200')
+          : freshBanner;
+        
+        setBannerImg(sanitizedBanner);
+        localStorage.setItem('cachedBanner', sanitizedBanner);
       } catch (err) {
         console.warn("Could not load data from database:", err);
       } finally {
@@ -396,8 +424,12 @@ export default function App(): React.ReactElement {
       localStorage.setItem('cachedCategories', JSON.stringify(filteredCategories));
       console.log('✅ Categories refreshed from DB');
       
-      setBannerImg(freshBanner);
-      localStorage.setItem('cachedBanner', freshBanner);
+      const sanitizedBanner = freshBanner.includes('photo-1578921049066-f845f67c53e8')
+        ? (CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200')
+        : freshBanner;
+      
+      setBannerImg(sanitizedBanner);
+      localStorage.setItem('cachedBanner', sanitizedBanner);
       console.log('✅ Banner refreshed from DB');
     } catch (err) {
       console.warn("Could not refresh data from database:", err);
@@ -961,7 +993,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                 {/* Desktop Banner View */}
                 <div className="hidden md:block w-full h-full relative overflow-hidden">
                   <img 
-                    src={optimizeImageUrl(config.desktop_url, 1200) || fallbackBanner} 
+                    src={optimizeImageUrl(config.desktop_url || fallbackBanner, 1200)} 
                     className="w-full h-full object-cover transition-all duration-300"
                     style={{
                       objectPosition: `${config.desktop_x}% ${config.desktop_y}%`,
@@ -971,14 +1003,14 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                     alt="Desktop Banner" 
                     fetchPriority="high"
                     decoding="async"
-                    onError={(e: any) => { e.target.src = fallbackBanner; }} 
+                    onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackBanner, 1200); }} 
                   />
                 </div>
                 
                 {/* Mobile Banner View */}
                 <div className="block md:hidden w-full h-full relative overflow-hidden">
                   <img 
-                    src={optimizeImageUrl(config.mobile_url, 600) || fallbackBanner} 
+                    src={optimizeImageUrl(config.mobile_url || fallbackBanner, 600)} 
                     className="w-full h-full object-cover transition-all duration-300"
                     style={{
                       objectPosition: `${config.mobile_x}% ${config.mobile_y}%`,
@@ -988,7 +1020,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                     alt="Mobile Banner" 
                     fetchPriority="high"
                     decoding="async"
-                    onError={(e: any) => { e.target.src = fallbackBanner; }} 
+                    onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackBanner, 600); }} 
                   />
                 </div>
               </>
@@ -1011,7 +1043,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                     style={{ border: "1px solid var(--accent)" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
-                    <img src={optimizeImageUrl(c.img, 200) || fallbackCategory} className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = fallbackCategory; }} />
+                    <img src={optimizeImageUrl(c.img || fallbackCategory, 200)} className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackCategory, 200); }} />
                   </div>
                   <div className="mt-2 text-center text-sm uppercase tracking-wider" style={{ fontWeight: 600, color: "var(--accent)" }}>{c.name}</div>
                 </button>
@@ -1073,7 +1105,7 @@ function CategoriesPage({ categories, onCategory, onBack }: any) {
             style={{ border: "1px solid var(--accent)" }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 0 1px var(--accent)"; }}>
-            <img src={optimizeImageUrl(c.img, 400) || fallbackCategory} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = fallbackCategory; }} />
+            <img src={optimizeImageUrl(c.img || fallbackCategory, 400)} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackCategory, 400); }} />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
             <div className="absolute bottom-3 left-3 right-3 text-white uppercase tracking-[0.2em]" style={{ fontWeight: 600 }}>{c.name}</div>
           </button>
@@ -1089,7 +1121,7 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist }: any) {
   const isOneSize = product.sizes.length === 1 && product.sizes[0] === "One";
   const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] ?? "");
   const fallbackProduct = CONFIG.FALLBACK_PRODUCT;
-  const productImage = optimizeImageUrl(product.image_url || product.images?.[0] || '', 300);
+  const productImage = optimizeImageUrl(product.image_url || product.images?.[0] || fallbackProduct, 300);
 
   return (
     <div className="group p-2 rounded-xl transition flex flex-col" style={{ border: "1px solid var(--accent)" }}
@@ -1097,7 +1129,7 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist }: any) {
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
       {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900 cursor-pointer" onClick={() => onProduct(product.id)}>
-        <img src={productImage || fallbackProduct} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy" decoding="async" alt={product.name} onError={(e: any) => { e.target.src = fallbackProduct; }} />
+        <img src={productImage} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy" decoding="async" alt={product.name} onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackProduct, 300); }} />
         <button onClick={e => { e.stopPropagation(); onWish(product.id); }}
           className="absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center"
           style={{ background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}
