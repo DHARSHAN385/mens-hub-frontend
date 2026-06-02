@@ -1,4 +1,4 @@
-describe('Men\'s Hub Comprehensive E2E Test', () => {
+describe('Mens Hub Comprehensive E2E Test', () => {
   beforeEach(() => {
     // Visit the app and clear local storage to start fresh
     cy.visit('http://localhost:5173/');
@@ -6,7 +6,7 @@ describe('Men\'s Hub Comprehensive E2E Test', () => {
   });
   it('should navigate through the entire store, add items to cart, and place an order', () => {
     // 1. Homepage Verification
-    cy.contains(/Men's Hub/i).should('be.visible');
+    cy.contains(/Mens Hub/i).should('be.visible');
     
     // Wait for products to load
     cy.get('.grid').should('be.visible');

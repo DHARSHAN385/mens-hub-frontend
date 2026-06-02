@@ -16,7 +16,7 @@ export default function Policies({ onBack }: { onBack: () => void }) {
       <section className="mb-8 border-b pb-6 border-neutral-200 dark:border-neutral-800">
         <h2 className="text-2xl font-semibold mb-4 text-neutral-800 dark:text-neutral-200">Privacy Policy</h2>
         <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-3">
-          At Men's Hub, we respect your privacy and are committed to protecting your personal data. We collect information such as your name, delivery address, phone number, and email address solely to process your transactions and facilitate seamless delivery.
+          At Mens Hub, we respect your privacy and are committed to protecting your personal data. We collect information such as your name, delivery address, phone number, and email address solely to process your transactions and facilitate seamless delivery.
         </p>
         <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
           Your payment information is securely processed using standard SSL encryption via Cashfree Payments, and we never store your credit/debit card numbers or net banking credentials on our servers. Your information is never sold or shared with external third parties for marketing purposes.
@@ -49,7 +49,7 @@ export default function Policies({ onBack }: { onBack: () => void }) {
       <section className="mb-8 border-b pb-6 border-neutral-200 dark:border-neutral-800">
         <h2 className="text-2xl font-semibold mb-4 text-neutral-800 dark:text-neutral-200">Terms & Conditions</h2>
         <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-3">
-          By accessing or shopping at Men's Hub, you agree to comply with our Terms & Conditions. You agree to provide accurate, complete, and current information when creating an account or placing orders.
+          By accessing or shopping at Mens Hub, you agree to comply with our Terms & Conditions. You agree to provide accurate, complete, and current information when creating an account or placing orders.
         </p>
         <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
           All orders are subject to product availability. We reserve the right to cancel any order if there are inaccuracies in product details or pricing, or in cases of suspected transaction fraud. All disputes are subject to the exclusive jurisdiction of the courts in Madurai, Tamil Nadu, India.
@@ -63,7 +63,7 @@ export default function Policies({ onBack }: { onBack: () => void }) {
           For any questions regarding our terms, exchanges, or privacy guidelines, please reach out to us:
         </p>
         <div className="text-sm text-neutral-700 dark:text-neutral-300 space-y-2 bg-neutral-100 dark:bg-neutral-900 p-4 rounded-lg">
-          <p><strong>Merchant Name:</strong> Men's Hub</p>
+          <p><strong>Merchant Name:</strong> Mens Hub</p>
           <p><strong>Support Email:</strong> menshubadmin01@gmail.com</p>
           <p><strong>Contact Phone:</strong> +91 95240 97865</p>
           <p><strong>Registered Address:</strong> 13, Aruppukottai Main Rd, South Gate, South Gate, Mahalipatti, Madurai, Tamil Nadu 625001, India</p>

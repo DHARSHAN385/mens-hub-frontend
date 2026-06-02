@@ -34,7 +34,7 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
         <div className="absolute inset-0 z-0">
           <img 
             src={heroImage} 
-            alt="Men's Hub Sartorial Tailoring" 
+            alt="Mens Hub Sartorial Tailoring" 
             className="w-full h-full object-cover filter brightness-[0.35] contrast-[1.05]"
             loading="eager"
           />
@@ -46,7 +46,7 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
             <Sparkles size={14} /> Be Your Own Label
           </div>
           <h1 className="text-3xl md:text-5xl font-black text-white leading-tight uppercase tracking-wider mb-4">
-            Men's Hub
+            Mens Hub
           </h1>
           <p className="text-neutral-300 text-sm md:text-lg leading-relaxed font-medium">
             Redefining premium menswear with customized precision, contemporary designs, and timeless confidence. Founded in 2023.
@@ -144,7 +144,7 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
         <div className="lg:col-span-6 rounded-2xl overflow-hidden shadow-lg h-72 md:h-96">
           <img 
             src={showroomImage} 
-            alt="Men's Hub Boutique Showroom" 
+            alt="Mens Hub Boutique Showroom" 
             className="w-full h-full object-cover filter contrast-[1.02]"
             loading="lazy"
           />

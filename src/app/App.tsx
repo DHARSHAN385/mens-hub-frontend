@@ -762,10 +762,10 @@ function TopBar(props: any) {
         <button className="md:hidden p-2 -ml-2" onClick={() => setMenuOpen(true)} aria-label="Open navigation menu"><Menu size={22} /></button>
 
         {/* Logo */}
-        <button onClick={props.onLogo} className="flex items-center gap-2 group shrink-0" aria-label="Men's Hub Home">
-          <img src={logoImg} alt="Men's Hub" width="44" height="44" className="h-11 w-11 rounded-lg object-cover object-top" style={{ boxShadow: "0 0 0 1.5px var(--accent)" }} />
+        <button onClick={props.onLogo} className="flex items-center gap-2 group shrink-0" aria-label="Mens Hub Home">
+          <img src={logoImg} alt="Mens Hub" width="44" height="44" className="h-11 w-11 rounded-lg object-cover object-top" style={{ boxShadow: "0 0 0 1.5px var(--accent)" }} />
           <div className="flex flex-col leading-none">
-            <span className="tracking-[0.25em] uppercase" style={{ fontWeight: 700, color: "var(--accent)" }}>Men's Hub</span>
+            <span className="tracking-[0.25em] uppercase" style={{ fontWeight: 700, color: "var(--accent)" }}>Mens Hub</span>
             <span className="text-[10px] tracking-widest uppercase" style={{ color: "var(--accent-soft)", opacity: 0.85 }}>Be Your Own Label</span>
           </div>
         </button>
@@ -1021,7 +1021,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
   return (
     <div className="max-w-7xl mx-auto px-4">
       {/* Visually hidden h1 for SEO and heading structure outline */}
-      <h1 className="sr-only">Men's Hub – Premium Men's Fashion</h1>
+      <h1 className="sr-only">Mens Hub – Premium Men's Fashion</h1>
       {/* Hero Banner — Responsive and adjustable */}
       <section className="relative my-6 rounded-2xl overflow-hidden h-64 md:h-96 bg-neutral-900" style={{ border: "1.5px solid var(--accent)" }}>
         {loading ? (
@@ -1670,7 +1670,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
     <div className="max-w-md mx-auto px-4 py-16 text-center">
       <div className="w-16 h-16 mx-auto rounded-full bg-green-500 text-white flex items-center justify-center"><Check size={32} /></div>
       <h2 className="uppercase tracking-[0.2em] mt-4">Order Placed!</h2>
-      <p className="mt-2 text-neutral-500">Thank you for shopping at Men's Hub. Your order is being processed.</p>
+      <p className="mt-2 text-neutral-500">Thank you for shopping at Mens Hub. Your order is being processed.</p>
       <button onClick={onPlaced} className="mt-6 px-6 py-3 uppercase text-sm tracking-wider" style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>View Orders</button>
     </div>
   );
@@ -3532,7 +3532,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                     }
                     const cleanPhone = phoneNum.replace(/\D/g, '');
                     const finalPhone = cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone;
-                    const message = `Hello, this is Men's Hub Admin regarding your order #${viewingOrder.order_number || viewingOrder.id}.`;
+                    const message = `Hello, this is Mens Hub Admin regarding your order #${viewingOrder.order_number || viewingOrder.id}.`;
                     window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`, '_blank');
                   }}
                   className="flex-1 py-2.5 rounded-xl text-white font-medium flex items-center justify-center gap-2 transition"
@@ -4102,8 +4102,8 @@ function Footer({ onNavigate }: any) {
       <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <img src={logoImg} alt="Men's Hub" className="h-10 w-10 rounded-lg object-cover object-top" style={{ boxShadow: "0 0 0 1.5px var(--accent)" }} />
-            <span className="tracking-[0.25em] uppercase" style={{ fontWeight: 700, color: "var(--accent)" }}>Men's Hub</span>
+            <img src={logoImg} alt="Mens Hub" className="h-10 w-10 rounded-lg object-cover object-top" style={{ boxShadow: "0 0 0 1.5px var(--accent)" }} />
+            <span className="tracking-[0.25em] uppercase" style={{ fontWeight: 700, color: "var(--accent)" }}>Mens Hub</span>
           </div>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">Premium MensHub for the modern gentleman.
             Style that defines confidence.</p>
@@ -4148,7 +4148,7 @@ function Footer({ onNavigate }: any) {
           </div>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 text-center">© 2026 Men's Hub. All rights reserved.</div>
+      <div className="max-w-7xl mx-auto mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 text-center">© 2026 Mens Hub. All rights reserved.</div>
     </footer>
   );
 }
