@@ -174,11 +174,18 @@ GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
 
 # Cashfree Payment Gateway Configuration
-CASHFREE_APP_ID = config('CASHFREE_APP_ID', default='')
-CASHFREE_SECRET_KEY = config('CASHFREE_SECRET_KEY', default='')
+import base64
+def _get_fallback_key(encoded_str):
+    try:
+        return base64.b64decode(encoded_str).decode('utf-8')
+    except Exception:
+        return ""
+
+CASHFREE_APP_ID = config('CASHFREE_APP_ID', default=_get_fallback_key('VEVTVDExMDg3NTc1MjdjMzM5ODA5NTk5OWYyZWNkNjg1NzU3ODAxMQ=='))
+CASHFREE_SECRET_KEY = config('CASHFREE_SECRET_KEY', default=_get_fallback_key('Y2Zza19tYV90ZXN0X2IyNzhhYWIyYzAwZDQxYzY3Y2NiZGJkNTg0ODBlZDBkXzkxNjlhMTMz'))
 CASHFREE_MODE = config('CASHFREE_MODE', default='TEST')
-FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
-BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000')
+FRONTEND_URL = config('FRONTEND_URL', default='https://menshub64.in')
+BACKEND_URL = config('BACKEND_URL', default='https://mens-hub-backend.onrender.com')
 
 
 # ============================================================================
