@@ -160,8 +160,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    # Pagination disabled globally to allow frontend to retrieve all products and categories
+    # and perform client-side filtering and sorting.
+    'DEFAULT_PAGINATION_CLASS': None,
 }
 
 # Google OAuth Configuration
