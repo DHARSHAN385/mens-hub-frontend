@@ -1627,6 +1627,15 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
         throw new Error("Did not receive payment_session_id from backend");
       }
 
+      // Re-initialize Cashfree with the correct mode returned by backend (TEST or PROD)
+      if (initiationResult.mode) {
+        console.log(`🔄 Dynamically switching Cashfree to backend mode: ${initiationResult.mode}`);
+        cashfreeService.initialize({
+          appId: 'placeholder',
+          mode: initiationResult.mode
+        });
+      }
+
       // 4. Trigger Cashfree SDK Checkout Popup Overlay
       toast.info("💳 Launching Cashfree secure gateway...");
       const modalResult = await cashfreeService.openPaymentModal(sessionId, orderNumber);
