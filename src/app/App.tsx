@@ -377,10 +377,15 @@ export default function App(): React.ReactElement {
     loadData();
   }, []);
 
-  // Save temporary cart to localStorage (synced to DB on login)
+  // Save temporary cart to localStorage and sync to database if user is logged in
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(cart));
-  }, [cart]);
+    if (user) {
+      cartService.updateCart(cart).catch((err) => {
+        console.warn("Failed to sync cart changes to database:", err);
+      });
+    }
+  }, [cart, user]);
 
   // Save temporary wishlist to localStorage (synced to DB on login)
   useEffect(() => {
@@ -462,6 +467,31 @@ export default function App(): React.ReactElement {
 
   const toggleWishlist = (id: string) => {
     requireAuth(() => setWishlist((w: string[]) => w.includes(id) ? w.filter((x: string) => x !== id) : [...w, id]));
+  };
+
+  const addToCart = (product: Product, size: string) => {
+    requireAuth(() => {
+      const selectedSize = size || product.sizes[0] || "One";
+      setCart((prevCart: CartItem[]) => {
+        const existingIdx = prevCart.findIndex(
+          (item: CartItem) => item.product.id === product.id && item.size === selectedSize
+        );
+        if (existingIdx >= 0) {
+          const newQty = prevCart[existingIdx].qty + 1;
+          if (newQty > 5) {
+            toast.error("Stock limit reached (Max 5 per item)");
+            return prevCart;
+          }
+          const copy = [...prevCart];
+          copy[existingIdx] = { ...copy[existingIdx], qty: newQty };
+          toast.success(`Updated ${product.name} (${selectedSize}) quantity to ${newQty} in cart!`);
+          return copy;
+        } else {
+          toast.success(`Added ${product.name} (${selectedSize}) to cart!`);
+          return [...prevCart, { product, size: selectedSize, qty: 1 }];
+        }
+      });
+    });
   };
 
   /* Called after customer places order — fires admin notification */
@@ -562,7 +592,7 @@ export default function App(): React.ReactElement {
             onProduct={(id: string) => navigate({ name: "product", id })}
             onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist}
             onAllCategories={() => navigate({ name: "categories" })}
-            loading={loading} />
+            loading={loading} onAddToCart={addToCart} />
         )}
         {page.name === "categories" && (
           <CategoriesPage categories={categories}
@@ -573,18 +603,18 @@ export default function App(): React.ReactElement {
             title={categories.find((c: Category) => String(c.id) === String((page as any).id))?.name || "Products"}
             products={products.filter((p: Product) => String(p.category) === String((page as any).id))}
             onProduct={(id: string) => navigate({ name: "product", id })}
-            onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} />
+            onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} onAddToCart={addToCart} />
         )}
         {page.name === "search" && (
           <ListingPage
             title={(page as any).query ? `Results for "${(page as any).query}"` : "All Products"}
             products={products.filter((p: Product) => p.name.toLowerCase().includes(((page as any).query || "").toLowerCase()))}
             onProduct={(id: string) => navigate({ name: "product", id })}
-            onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} />
+            onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} onAddToCart={addToCart} />
         )}
         {page.name === "product" && (
           <ProductPage product={products.find((p: Product) => p.id === (page as any).id)!}
-            onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} />
+            onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} onAddToCart={addToCart} />
         )}
         {page.name === "cart" && (
           <CartPage cart={cart} setCart={setCart}
@@ -982,7 +1012,7 @@ function SkeletonProductCard() {
 }
 
 /* ─────────────────── Home Page ─────────────────── */
-function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBuy, onWish, wishlist, onAllCategories, loading }: any) {
+function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBuy, onWish, wishlist, onAllCategories, loading, onAddToCart }: any) {
   const visibleCats = categories.slice(0, 5);
   const hasMore = categories.length > 5;
   const fallbackBanner = CONFIG.FALLBACK_BANNER;
@@ -1090,7 +1120,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {products.filter((p: Product) => p.featured).map((p: Product) => (
-              <ProductCard key={p.id} product={p} onProduct={onProduct} onBuy={onBuy} onWish={onWish} wishlist={wishlist} />
+              <ProductCard key={p.id} product={p} onProduct={onProduct} onBuy={onBuy} onWish={onWish} wishlist={wishlist} onAddToCart={onAddToCart} />
             ))}
           </div>
         )}
@@ -1127,7 +1157,7 @@ function CategoriesPage({ categories, onCategory, onBack }: any) {
 }
 
 /* ─────────────────── Product Card ─────────────────── */
-function ProductCard({ product, onProduct, onBuy, onWish, wishlist }: any) {
+function ProductCard({ product, onProduct, onBuy, onWish, wishlist, onAddToCart }: any) {
   const wished = wishlist.includes(product.id);
   const isOneSize = product.sizes.length === 1 && product.sizes[0] === "One";
   const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] ?? "");
@@ -1141,8 +1171,16 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist }: any) {
       {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900 cursor-pointer" onClick={() => onProduct(product.id)}>
         <img src={productImage} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy" decoding="async" alt={product.name} onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackProduct, 300); }} />
+        {/* Add to Cart button */}
+        <button onClick={e => { e.stopPropagation(); onAddToCart(product, selectedSize); }}
+          className="absolute top-2 w-9 h-9 rounded-full flex items-center justify-center shadow-sm transition hover:scale-110 active:scale-95"
+          style={{ right: "3rem", background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}
+          aria-label="Add to cart">
+          <ShoppingCart size={16} style={{ color: "var(--accent)" }} />
+        </button>
+        {/* Wishlist button */}
         <button onClick={e => { e.stopPropagation(); onWish(product.id); }}
-          className="absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center"
+          className="absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center transition hover:scale-110 active:scale-95"
           style={{ background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}
           aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}>
           <Heart size={16} className={wished ? "fill-red-500 text-red-500" : ""} style={{ color: wished ? undefined : "var(--accent-soft)" }} />
@@ -1184,7 +1222,7 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist }: any) {
 }
 
 /* ─────────────────── Listing Page ─────────────────── */
-function ListingPage({ title, products, onProduct, onBuy, onWish, wishlist, onBack }: any) {
+function ListingPage({ title, products, onProduct, onBuy, onWish, wishlist, onBack, onAddToCart }: any) {
   const [sort, setSort] = useState("popular");
   const [maxPrice, setMaxPrice] = useState(5000);
   const [size, setSize] = useState("");
@@ -1243,7 +1281,7 @@ function ListingPage({ title, products, onProduct, onBuy, onWish, wishlist, onBa
         ? <div className="py-20 text-center text-neutral-500 font-medium">No Products Available</div>
         : <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
           {filtered.slice(0, visible).map((p: Product) => (
-            <ProductCard key={p.id} product={p} onProduct={onProduct} onBuy={onBuy} onWish={onWish} wishlist={wishlist} />
+            <ProductCard key={p.id} product={p} onProduct={onProduct} onBuy={onBuy} onWish={onWish} wishlist={wishlist} onAddToCart={onAddToCart} />
           ))}
         </div>
       }
@@ -1252,7 +1290,7 @@ function ListingPage({ title, products, onProduct, onBuy, onWish, wishlist, onBa
 }
 
 /* ─────────────────── All Products Page ─────────────────── */
-function AllProductsPage({ products, categories, onProduct, onBuy, onWish, wishlist, onBack }: any) {
+function AllProductsPage({ products, categories, onProduct, onBuy, onWish, wishlist, onBack, onAddToCart }: any) {
   const [activeCat, setActiveCat] = useState<string>("all");
   const [visible, setVisible] = useState(12);
 
@@ -1317,7 +1355,7 @@ function AllProductsPage({ products, categories, onProduct, onBuy, onWish, wishl
         ? <div className="py-20 text-center text-neutral-500">No products found</div>
         : <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {filtered.slice(0, visible).map((p: Product) => (
-            <ProductCard key={p.id} product={p} onProduct={onProduct} onBuy={onBuy} onWish={onWish} wishlist={wishlist} />
+            <ProductCard key={p.id} product={p} onProduct={onProduct} onBuy={onBuy} onWish={onWish} wishlist={wishlist} onAddToCart={onAddToCart} />
           ))}
         </div>
       }
@@ -1335,7 +1373,7 @@ function AllProductsPage({ products, categories, onProduct, onBuy, onWish, wishl
 }
 
 /* ─────────────────── Product Page ───���─────────────── */
-function ProductPage({ product, onBuy, onWish, wishlist, onBack }: any) {
+function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: any) {
   const [imgIdx, setImgIdx] = useState(0);
   const [size, setSize] = useState(product.sizes[0]);
   const wished = wishlist.includes(product.id);
@@ -1384,9 +1422,11 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack }: any) {
             </div>
           </div>
           <div className="flex gap-3 mt-8">
-            <button onClick={() => onBuy(product, size)} className="flex-1 py-3 uppercase tracking-wider text-sm rounded-md"
+            <button onClick={() => onAddToCart(product, size)} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90"
+              style={{ border: "1px solid var(--accent)", color: "var(--accent)", background: "transparent" }}>Add to Cart</button>
+            <button onClick={() => onBuy(product, size)} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90"
               style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>Buy Now</button>
-            <button onClick={() => onWish(product.id)} className="px-4 border border-neutral-300 dark:border-neutral-700" aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}>
+            <button onClick={() => onWish(product.id)} className="px-4 border border-neutral-300 dark:border-neutral-700 flex items-center justify-center rounded-md transition hover:scale-105" aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}>
               <Heart size={20} className={wished ? "fill-red-500 text-red-500" : ""} />
             </button>
           </div>
@@ -1829,7 +1869,7 @@ function GoogleOAuthLoginButton({ onSuccess, onError }: any) {
 }
 
 /* ─────────────────── Wishlist Page ─────────────────── */
-function WishlistPage({ products, onProduct, onBuy, onWish, wishlist, onBack }: any) {
+function WishlistPage({ products, onProduct, onBuy, onWish, wishlist, onBack, onAddToCart }: any) {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="flex items-center gap-3 mb-2">
@@ -1861,6 +1901,11 @@ function WishlistPage({ products, onProduct, onBuy, onWish, wishlist, onBack }: 
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
                 <div className="relative aspect-[3/4] overflow-hidden bg-neutral-100 dark:bg-neutral-900 cursor-pointer" onClick={() => onProduct(p.id)}>
                   <img src={p.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                  <button onClick={e => { e.stopPropagation(); onAddToCart(p, p.sizes[0]); }} title="Add to cart"
+                    className="absolute top-3 w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition"
+                    style={{ right: "3.25rem", background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}>
+                    <ShoppingCart size={16} style={{ color: "var(--accent)" }} />
+                  </button>
                   <button onClick={e => { e.stopPropagation(); onWish(p.id); }} title="Remove"
                     className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition"
                     style={{ background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}>
@@ -1877,7 +1922,7 @@ function WishlistPage({ products, onProduct, onBuy, onWish, wishlist, onBack }: 
             ))}
           </div>
           <div className="grid grid-cols-2 gap-4 md:hidden">
-            {products.map((p: Product) => <ProductCard key={p.id} product={p} onProduct={onProduct} onBuy={onBuy} onWish={onWish} wishlist={wishlist} />)}
+            {products.map((p: Product) => <ProductCard key={p.id} product={p} onProduct={onProduct} onBuy={onBuy} onWish={onWish} wishlist={wishlist} onAddToCart={onAddToCart} />)}
           </div>
         </>
       )}
