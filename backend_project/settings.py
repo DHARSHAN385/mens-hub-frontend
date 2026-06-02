@@ -181,8 +181,8 @@ def _get_fallback_key(encoded_str):
     except Exception:
         return ""
 
-CASHFREE_APP_ID = config('CASHFREE_APP_ID', default=_get_fallback_key('MTI5Mjc0NTllMTNmNmQ1ODY3ZGQzMWZmZGU1NDcyOTIx'))
-CASHFREE_SECRET_KEY = config('CASHFREE_SECRET_KEY', default=_get_fallback_key('Y2Zza19tYV9wcm9kXzk2NTIzNDJmODQyM2E3NTk2MmE2Y2YxYWIxYTIyNGFfZTQwNDFmZk8='))
+CASHFREE_APP_ID = config('CASHFREE_APP_ID', default=_get_fallback_key('MTI5Mjc0NTllMTNmNmQ1ODY3ZGRkMzFmZmRlNTQ3MjkyMQ=='))
+CASHFREE_SECRET_KEY = config('CASHFREE_SECRET_KEY', default=_get_fallback_key('Y2Zza19tYV9wcm9kXzk2NTIzNDJmODQyM2E3NTk2MmE2MmNmMWFiMWEyMjRhX2U0MDQxZmYw'))
 CASHFREE_MODE = config('CASHFREE_MODE', default='PROD')
 FRONTEND_URL = config('FRONTEND_URL', default='https://menshub64.in')
 BACKEND_URL = config('BACKEND_URL', default='https://mens-hub-backend.onrender.com')
