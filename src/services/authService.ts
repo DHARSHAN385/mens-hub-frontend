@@ -1,6 +1,7 @@
 // Authentication service for user login, registration, and token management
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com/api';
+const BASE_API_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com/api';
+const API_URL = BASE_API_URL.endsWith('/api') ? BASE_API_URL : `${BASE_API_URL}/api`;
 
 export interface User {
   id: number;
