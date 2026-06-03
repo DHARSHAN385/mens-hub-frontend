@@ -901,7 +901,7 @@ function TopBar(props: any) {
           </div>
 
           {/* Cart */}
-          <IconBtn onClick={props.onCart} className="hidden md:inline-flex" aria-label="View shopping cart">
+          <IconBtn onClick={props.onCart} className="inline-flex" aria-label="View shopping cart">
             <ShoppingBag size={18} />
             {props.cartCount > 0 && (
               <span className="absolute -top-1 -right-1 text-[10px] rounded-full w-4 h-4 flex items-center justify-center"
