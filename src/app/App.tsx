@@ -136,6 +136,53 @@ export function optimizeImageUrl(url: string, width: number): string {
   return result;
 }
 
+export function getColorHex(c: string): string {
+  if (!c) return "#95a5a6";
+  const clean = c.split('|')[0].toLowerCase().trim();
+  const colorMap: { [key: string]: string } = {
+    yellow: "#eab308",
+    green: "#22c55e",
+    white: "#ffffff",
+    black: "#000000",
+    "dark yellow": "#ca8a04",
+    "navy blue": "#1e3a8a",
+    red: "#ef4444",
+    grey: "#737373",
+    blue: "#3b82f6",
+    pink: "#ec4899",
+    orange: "#f97316",
+    purple: "#a855f7",
+    brown: "#78350f",
+    maroon: "#800000",
+    lavender: "#e6e6fa",
+    "dark violet": "#9400d3",
+    violet: "#ee82ee",
+    magenta: "#ff00ff",
+    cyan: "#00ffff",
+    gold: "#ffd700",
+    silver: "#c0c0c0",
+    olive: "#808000",
+    teal: "#008080",
+    navy: "#000080",
+    mustard: "#e1ad01",
+    cream: "#fffdd0",
+    beige: "#f5f5dc",
+    peach: "#ffdab9",
+    plum: "#dda0dd"
+  };
+
+  if (colorMap[clean]) return colorMap[clean];
+
+  const noSpaces = clean.replace(/\s+/g, '');
+  if (colorMap[noSpaces]) return colorMap[noSpaces];
+
+  if (/^#(?:[0-9a-fA-F]{3}){1,2}$/.test(clean)) {
+    return clean;
+  }
+
+  return clean;
+}
+
 
 export function parseBannerConfig(bannerData?: string): BannerConfig {
   const fallbackBanner = CONFIG.FALLBACK_BANNER || "";
@@ -1938,14 +1985,15 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
               <div className="text-sm uppercase tracking-wider mb-2">Select Color</div>
               <div className="flex flex-wrap gap-2">
                 {colorsList.map((c: string) => {
-                  const hex = colorMap[c.toLowerCase()] || "#95a5a6";
-                  const isWhite = c.toLowerCase() === 'white';
-                  const isSelected = customColor === c;
+                  const [colorName, colorHex] = c.split('|');
+                  const hex = colorHex || getColorHex(colorName);
+                  const isWhite = colorName.toLowerCase() === 'white';
+                  const isSelected = customColor === colorName;
                   return (
                     <button
                       key={c}
                       type="button"
-                      onClick={() => setCustomColor(c)}
+                      onClick={() => setCustomColor(colorName)}
                       className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold uppercase transition-all duration-200 ${
                         isSelected 
                           ? "ring-2 ring-neutral-900 dark:ring-white scale-105" 
@@ -1962,7 +2010,7 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
                         className={`w-3.5 h-3.5 rounded-full inline-block ${isWhite ? "border border-neutral-300" : ""}`}
                         style={{ backgroundColor: hex }}
                       />
-                      {c}
+                      {colorName}
                     </button>
                   );
                 })}
@@ -2089,7 +2137,13 @@ function CartPage({ cart, setCart, onCheckout, onBack, total }: any) {
               <div className="flex-1">
                 <div>{item.product.name}</div>
                 <div className="text-sm text-neutral-500">Size: {item.size}</div>
-                {item.customColor && <div className="text-xs text-neutral-500 mt-0.5">Color: {item.customColor}</div>}
+                {item.customColor && (
+                  <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
+                    <span>Color:</span>
+                    <span className="w-2.5 h-2.5 rounded-full inline-block border border-black/10 shrink-0" style={{ backgroundColor: getColorHex(item.customColor) }} />
+                    <span>{item.customColor}</span>
+                  </div>
+                )}
                 {item.customDesign && (
                   <div className="text-xs text-neutral-500 flex items-center gap-1.5 mt-1">
                     <span>Design:</span>
@@ -2863,7 +2917,13 @@ function OrdersPage({ user, onBack }: any) {
                     <div>
                       <p className="font-medium">{item.name}</p>
                       <p className="text-sm text-neutral-500">Size: {item.size} | Qty: {item.qty}</p>
-                      {item.customColor && <p className="text-xs text-neutral-500 mt-0.5">Color: {item.customColor}</p>}
+                      {item.customColor && (
+                        <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
+                          <span>Color:</span>
+                          <span className="w-2.5 h-2.5 rounded-full inline-block border border-black/10 shrink-0" style={{ backgroundColor: getColorHex(item.customColor) }} />
+                          <span>{item.customColor}</span>
+                        </div>
+                      )}
                       {item.customDesign && (
                         <div className="text-xs text-neutral-500 flex items-center gap-1.5 mt-1">
                           <span>Design:</span>
@@ -4095,7 +4155,13 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                             <img src={optimizeImageUrl(imgUrl, 80)} className="w-10 h-10 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800 shrink-0" onError={(e: any) => e.target.src = fallbackImg} />
                             <div>
                               <div className="font-semibold">{item.name || item.product_name}</div>
-                              {item.customColor && <div className="text-[10px] text-neutral-500 mt-0.5">Color: {item.customColor}</div>}
+                              {item.customColor && (
+                                <div className="text-[10px] text-neutral-500 mt-0.5 flex items-center gap-1">
+                                  <span>Color:</span>
+                                  <span className="w-2.5 h-2.5 rounded-full inline-block border border-black/10 shrink-0" style={{ backgroundColor: getColorHex(item.customColor) }} />
+                                  <span>{item.customColor}</span>
+                                </div>
+                              )}
                               {item.customDesign && (
                                 <div className="text-[10px] text-neutral-500 flex items-center gap-1.5 mt-1">
                                   <span>Design:</span>
