@@ -155,6 +155,7 @@ export function getColorHex(c: string): string {
     brown: "#78350f",
     maroon: "#800000",
     lavender: "#e6e6fa",
+    lavendar: "#e6e6fa", // tolerate spelling used by admin
     "dark violet": "#9400d3",
     violet: "#ee82ee",
     magenta: "#ff00ff",
@@ -173,8 +174,13 @@ export function getColorHex(c: string): string {
 
   if (colorMap[clean]) return colorMap[clean];
 
-  const noSpaces = clean.replace(/\s+/g, '');
-  if (colorMap[noSpaces]) return colorMap[noSpaces];
+  // Try matching keys by removing spaces from both clean and colorMap keys
+  const cleanNoSpace = clean.replace(/\s+/g, '');
+  for (const key of Object.keys(colorMap)) {
+    if (key.replace(/\s+/g, '') === cleanNoSpace) {
+      return colorMap[key];
+    }
+  }
 
   if (/^#(?:[0-9a-fA-F]{3}){1,2}$/.test(clean)) {
     return clean;
@@ -1898,9 +1904,13 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
   const [customColor, setCustomColor] = useState("");
   const [customDesign, setCustomDesign] = useState("");
 
-  const colorsList = Array.isArray(product.color_patterns) && product.color_patterns.length > 0 
-    ? product.color_patterns 
-    : ["Yellow", "Green", "White", "Black", "Dark Yellow", "Navy Blue", "Red", "Grey", "Blue"];
+  const colorsList = useMemo(() => {
+    const defaultColors = ["Yellow", "Green", "White", "Black", "Dark Yellow", "Navy Blue", "Red", "Grey", "Blue", "Pink", "Orange", "Purple", "Brown"];
+    const custom = Array.isArray(product.color_patterns) ? product.color_patterns : [];
+    const customNames = new Set(custom.map((c: string) => c.split('|')[0].trim().toLowerCase()));
+    const filteredDefaults = defaultColors.filter(d => !customNames.has(d.toLowerCase()));
+    return [...filteredDefaults, ...custom];
+  }, [product.color_patterns]);
 
   const designsList = Array.isArray(product.custom_designs) ? product.custom_designs : [];
 
