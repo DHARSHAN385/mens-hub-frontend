@@ -183,7 +183,7 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
               <Phone className="mt-1 flex-shrink-0" size={18} style={{ color: "var(--accent)" }} />
               <div>
                 <h4 className="font-bold text-sm">Call/WhatsApp Support</h4>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">+91 95240 97865</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">+91 73972 31852</p>
               </div>
             </div>
           </div>

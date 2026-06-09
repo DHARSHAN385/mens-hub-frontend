@@ -81,6 +81,8 @@ class Product(models.Model):
     images = models.JSONField(default=list, blank=True)
     stock = models.IntegerField(default=0)
     sizes = models.JSONField(default=list, blank=True)
+    custom_designs = models.JSONField(default=list, blank=True, help_text="List of design image URLs for Stone Shirts")
+    color_patterns = models.JSONField(default=list, blank=True, help_text="List of available color patterns for Stone Shirts")
     popularity = models.IntegerField(default=0, db_index=True)
     featured = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)

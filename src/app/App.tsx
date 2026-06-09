@@ -47,8 +47,8 @@ import {
 
 /* ─────────────────── Types ─────────────────── */
 type Category = { id: number | string; name: string; img: string };
-type Product = { id: string; name: string; price: number; category: string | number; image_url?: string; category_image?: string; banner_image?: string; images?: string[]; popularity: number; sizes: string[]; featured?: boolean };
-type CartItem = { product: Product; size: string; qty: number };
+type Product = { id: string; name: string; price: number; category: string | number; image_url?: string; category_image?: string; banner_image?: string; images?: string[]; popularity: number; sizes: string[]; featured?: boolean; custom_designs?: string[]; color_patterns?: string[] };
+type CartItem = { product: Product; size: string; qty: number; customColor?: string; customDesign?: string };
 type OrderNotification = {
   id: string;
   orderId: string;
@@ -103,6 +103,7 @@ export function optimizeImageUrl(url: string, width: number): string {
     result = CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200';
   }
 
+  // Optimize Unsplash images natively via their query parameters
   if (result.includes('images.unsplash.com')) {
     try {
       const urlObj = new URL(result);
@@ -114,18 +115,27 @@ export function optimizeImageUrl(url: string, width: number): string {
       if (!urlObj.searchParams.has('fit')) {
         urlObj.searchParams.set('fit', 'crop');
       }
-      result = urlObj.toString();
+      return urlObj.toString();
     } catch (e) {
       if (result.includes('w=')) {
-        result = result.replace(/w=\d+/, `w=${width}`);
+        return result.replace(/w=\d+/, `w=${width}`);
       } else {
         const separator = result.includes('?') ? '&' : '?';
-        result = `${result}${separator}w=${width}&q=75&auto=format&fit=crop`;
+        return `${result}${separator}w=${width}&q=75&auto=format&fit=crop`;
       }
     }
   }
+
+  // For any other public web URLs (like backend uploads, WhatsApp images, Hostinger uploads), proxy through wsrv.nl to resize, crop, and convert to lightweight WebP format
+  if (result.startsWith('http://') || result.startsWith('https://')) {
+    if (result.includes('wsrv.nl')) return result; // avoid double proxying
+    const encoded = encodeURIComponent(result);
+    return `https://wsrv.nl/?url=${encoded}&w=${width}&q=75&output=webp`;
+  }
+
   return result;
 }
+
 
 export function parseBannerConfig(bannerData?: string): BannerConfig {
   const fallbackBanner = CONFIG.FALLBACK_BANNER || "";
@@ -221,6 +231,408 @@ const DEFAULT_SEED_CATEGORY_NAMES = [
   'accessories',
   'sarees'
 ];
+/* ═══════════════════════════════════════════════
+   INITIAL REAL LIVE DATA (PRE-POPULATED TO PREVENT LAYOUT SHIFT & SPEED UP LCP)
+═══════════════════════════════════════════════ */
+const INITIAL_PRODUCTS: Product[] = [
+  {
+    id: "90",
+    name: "shirt",
+    price: 579,
+    category: 37,
+    image_url: "https://menshub64.in/media/uploads/1780371312_WhatsApp_Image_2026-05-10_at_2.04.37_PM.jpg",
+    images: ["https://menshub64.in/media/uploads/1780371312_WhatsApp_Image_2026-05-10_at_2.04.37_PM.jpg"],
+    sizes: ["M", "L", "S", "XL", "XXL"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "89",
+    name: "shirts",
+    price: 570,
+    category: 37,
+    image_url: "https://menshub64.in/media/uploads/1780371287_WhatsApp_Image_2026-05-10_at_2.04.37_PM_1.jpg",
+    images: ["https://menshub64.in/media/uploads/1780371287_WhatsApp_Image_2026-05-10_at_2.04.37_PM_1.jpg"],
+    sizes: ["M", "L", "S", "XL"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "88",
+    name: "shirts",
+    price: 550,
+    category: 37,
+    image_url: "https://menshub64.in/media/uploads/1780371253_WhatsApp_Image_2026-05-10_at_2.04.36_PM.jpg",
+    images: ["https://menshub64.in/media/uploads/1780371253_WhatsApp_Image_2026-05-10_at_2.04.36_PM.jpg"],
+    sizes: ["M", "S", "L", "XL", "XXL"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "87",
+    name: "shirts",
+    price: 678,
+    category: 37,
+    image_url: "https://menshub64.in/media/uploads/1780334824_WhatsApp_Image_2026-05-10_at_2.04.36_PM_1.jpg",
+    images: ["https://menshub64.in/media/uploads/1780334824_WhatsApp_Image_2026-05-10_at_2.04.36_PM_1.jpg"],
+    sizes: ["M"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "86",
+    name: "CROCKS",
+    price: 778,
+    category: 42,
+    image_url: "https://menshub64.in/media/uploads/1780333138_WhatsApp_Image_2026-05-10_at_2.07.26_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780333138_WhatsApp_Image_2026-05-10_at_2.07.26_PM.jpeg"],
+    sizes: ["11", "10", "9", "8", "7", "12"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "85",
+    name: "PREMIUM SHOE",
+    price: 1107,
+    category: 39,
+    image_url: "https://menshub64.in/media/uploads/1780333032_WhatsApp_Image_2026-05-10_at_2.07.14_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780333032_WhatsApp_Image_2026-05-10_at_2.07.14_PM.jpeg"],
+    sizes: ["7", "8", "9", "10", "11"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "84",
+    name: "SHOE",
+    price: 882,
+    category: 39,
+    image_url: "https://menshub64.in/media/uploads/1780332979_WhatsApp_Image_2026-05-10_at_2.07.14_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332979_WhatsApp_Image_2026-05-10_at_2.07.14_PM_1.jpeg"],
+    sizes: ["7", "8", "9", "10", "11"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "83",
+    name: "SHOE",
+    price: 700,
+    category: 39,
+    image_url: "https://menshub64.in/media/uploads/1780332937_WhatsApp_Image_2026-05-10_at_2.07.13_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332937_WhatsApp_Image_2026-05-10_at_2.07.13_PM.jpeg"],
+    sizes: ["7", "8", "9", "10", "11"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "82",
+    name: "VESTI SHIRT COMBO",
+    price: 670,
+    category: 36,
+    image_url: "https://menshub64.in/media/uploads/1780332900_WhatsApp_Image_2026-05-10_at_2.06.07_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332900_WhatsApp_Image_2026-05-10_at_2.06.07_PM.jpeg"],
+    sizes: ["M", "L", "XL", "XXL", "S"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "81",
+    name: "VESTI SHIRT COMBO",
+    price: 850,
+    category: 36,
+    image_url: "https://menshub64.in/media/uploads/1780332844_WhatsApp_Image_2026-05-10_at_2.06.07_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332844_WhatsApp_Image_2026-05-10_at_2.06.07_PM_1.jpeg"],
+    sizes: ["M", "L", "XL", "XXL", "S"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "80",
+    name: "VESTI SHIRT COMBO(COLOR)",
+    price: 899,
+    category: 11,
+    image_url: "https://menshub64.in/media/uploads/1780332784_WhatsApp_Image_2026-05-10_at_2.06.06_PM_2.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332784_WhatsApp_Image_2026-05-10_at_2.06.06_PM_2.jpeg"],
+    sizes: ["M", "S", "L", "XL"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "79",
+    name: "VESTI SHIRT COMBO",
+    price: 900,
+    category: 36,
+    image_url: "https://menshub64.in/media/uploads/1780332740_WhatsApp_Image_2026-05-10_at_2.06.06_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332740_WhatsApp_Image_2026-05-10_at_2.06.06_PM_1.jpeg"],
+    sizes: ["M", "L", "XL", "XXL", "S"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "78",
+    name: "STONE SHIRT",
+    price: 558,
+    category: 11,
+    image_url: "https://menshub64.in/media/uploads/1780332699_WhatsApp_Image_2026-05-10_at_2.05.36_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332699_WhatsApp_Image_2026-05-10_at_2.05.36_PM.jpeg"],
+    sizes: ["M", "L", "XL", "S", "XS", "XXL"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "77",
+    name: "STONE SHIRT",
+    price: 556,
+    category: 11,
+    image_url: "https://menshub64.in/media/uploads/1780332642_WhatsApp_Image_2026-05-10_at_2.05.36_PM_2.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332642_WhatsApp_Image_2026-05-10_at_2.05.36_PM_2.jpeg"],
+    sizes: ["M", "S", "XS", "L", "XL", "XXL"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "76",
+    name: "STONE SHIRT",
+    price: 560,
+    category: 11,
+    image_url: "https://menshub64.in/media/uploads/1780332614_WhatsApp_Image_2026-05-10_at_2.05.36_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332614_WhatsApp_Image_2026-05-10_at_2.05.36_PM_1.jpeg"],
+    sizes: ["M", "S", "XS", "L", "XL", "XXL"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "75",
+    name: "SHORTS",
+    price: 30,
+    category: 41,
+    image_url: "https://menshub64.in/media/uploads/1780332501_WhatsApp_Image_2026-05-10_at_2.05.18_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332501_WhatsApp_Image_2026-05-10_at_2.05.18_PM.jpeg"],
+    sizes: ["28", "30", "32", "34", "36", "38"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "74",
+    name: "TRACKS",
+    price: 670,
+    category: 41,
+    image_url: "https://menshub64.in/media/uploads/1780332461_WhatsApp_Image_2026-05-10_at_2.05.18_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332461_WhatsApp_Image_2026-05-10_at_2.05.18_PM_1.jpeg"],
+    sizes: ["30", "32", "34", "36"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "73",
+    name: "TRACK",
+    price: 500,
+    category: 41,
+    image_url: "https://menshub64.in/media/uploads/1780332416_WhatsApp_Image_2026-05-10_at_2.05.17_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332416_WhatsApp_Image_2026-05-10_at_2.05.17_PM.jpeg"],
+    sizes: ["28", "30", "32", "36", "34", "38"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "72",
+    name: "TRACK",
+    price: 560,
+    category: 41,
+    image_url: "https://menshub64.in/media/uploads/1780332370_WhatsApp_Image_2026-05-10_at_2.05.17_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332370_WhatsApp_Image_2026-05-10_at_2.05.17_PM_1.jpeg"],
+    sizes: ["M", "28", "30", "34", "32"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "71",
+    name: "T SHIRT",
+    price: 370,
+    category: 38,
+    image_url: "https://menshub64.in/media/uploads/1780332001_WhatsApp_Image_2026-05-10_at_2.05.00_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780332001_WhatsApp_Image_2026-05-10_at_2.05.00_PM.jpeg"],
+    sizes: ["M", "XL", "XXL", "L", "S"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "70",
+    name: "T SHIRT PREMIUM",
+    price: 350,
+    category: 38,
+    image_url: "https://menshub64.in/media/uploads/1780331951_WhatsApp_Image_2026-05-10_at_2.04.59_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331951_WhatsApp_Image_2026-05-10_at_2.04.59_PM.jpeg"],
+    sizes: ["M", "XL", "L", "S", "XS", "XXL"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "69",
+    name: "T SHIRT",
+    price: 399,
+    category: 38,
+    image_url: "https://menshub64.in/media/uploads/1780331895_WhatsApp_Image_2026-05-10_at_2.05.00_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331895_WhatsApp_Image_2026-05-10_at_2.05.00_PM_1.jpeg"],
+    sizes: ["M", "L", "XL", "S"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "68",
+    name: "PANTS",
+    price: 800,
+    category: 40,
+    image_url: "https://menshub64.in/media/uploads/1780331836_WhatsApp_Image_2026-05-10_at_2.07.51_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331836_WhatsApp_Image_2026-05-10_at_2.07.51_PM.jpeg"],
+    sizes: ["M", "28", "30", "32", "34", "36", "38"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "67",
+    name: "PANT",
+    price: 700,
+    category: 40,
+    image_url: "https://menshub64.in/media/uploads/1780331779_WhatsApp_Image_2026-05-10_at_2.07.52_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331779_WhatsApp_Image_2026-05-10_at_2.07.52_PM_1.jpeg"],
+    sizes: ["M", "28", "32", "30", "34", "36", "38"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "66",
+    name: "PANTS",
+    price: 650,
+    category: 40,
+    image_url: "https://menshub64.in/media/uploads/1780331727_WhatsApp_Image_2026-05-10_at_2.07.52_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331727_WhatsApp_Image_2026-05-10_at_2.07.52_PM.jpeg"],
+    sizes: ["28", "30", "32", "34", "36", "38"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "65",
+    name: "JEANS PANT",
+    price: 760,
+    category: 40,
+    image_url: "https://menshub64.in/media/uploads/1780331674_WhatsApp_Image_2026-05-10_at_2.07.53_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331674_WhatsApp_Image_2026-05-10_at_2.07.53_PM.jpeg"],
+    sizes: ["28", "30", "32", "34", "36", "38"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "64",
+    name: "SHIRT",
+    price: 570,
+    category: 37,
+    image_url: "https://menshub64.in/media/uploads/1780331627_WhatsApp_Image_2026-05-10_at_2.04.37_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331627_WhatsApp_Image_2026-05-10_at_2.04.37_PM.jpeg"],
+    sizes: ["M", "L", "S", "XL", "XXL"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "63",
+    name: "SHIRT",
+    price: 570,
+    category: 37,
+    image_url: "https://menshub64.in/media/uploads/1780331578_WhatsApp_Image_2026-05-10_at_2.04.37_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331578_WhatsApp_Image_2026-05-10_at_2.04.37_PM_1.jpeg"],
+    sizes: ["M", "S", "XS", "L", "XL", "XXL"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "62",
+    name: "SHIRT",
+    price: 550,
+    category: 37,
+    image_url: "https://menshub64.in/media/uploads/1780331538_WhatsApp_Image_2026-05-10_at_2.04.36_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331538_WhatsApp_Image_2026-05-10_at_2.04.36_PM.jpeg"],
+    sizes: ["M", "XS", "S", "L", "XL", "XXL"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "61",
+    name: "SHIRT",
+    price: 550,
+    category: 37,
+    image_url: "https://menshub64.in/media/uploads/1780331493_WhatsApp_Image_2026-05-10_at_2.04.36_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331493_WhatsApp_Image_2026-05-10_at_2.04.36_PM_1.jpeg"],
+    sizes: ["M", "S", "XS", "L"],
+    popularity: 5,
+    featured: false
+  },
+  {
+    id: "60",
+    name: "VESTI SHIRT",
+    price: 588,
+    category: 11,
+    image_url: "https://menshub64.in/media/uploads/1780331059_WhatsApp_Image_2026-05-10_at_2.06.07_PM_1.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780331059_WhatsApp_Image_2026-05-10_at_2.06.07_PM_1.jpeg"],
+    sizes: ["M", "S", "XS", "L", "XL", "XXL"],
+    popularity: 5,
+    featured: true
+  },
+  {
+    id: "13",
+    name: "stone shirt",
+    price: 520,
+    category: 11,
+    image_url: "https://menshub64.in/media/uploads/1780243195_WhatsApp_Image_2026-05-10_at_2.05.37_PM.jpeg",
+    images: ["https://menshub64.in/media/uploads/1780243195_WhatsApp_Image_2026-05-10_at_2.05.37_PM.jpeg"],
+    sizes: ["M", "XS", "XXL", "28", "L", "XL", "S"],
+    popularity: 5,
+    featured: true
+  }
+];
+
+const INITIAL_CATEGORIES: Category[] = [
+  {
+    id: 42,
+    name: "CROCKS",
+    img: "https://menshub64.in/media/uploads/1780332161_WhatsApp_Image_2026-05-10_at_2.07.26_PM.jpeg"
+  },
+  {
+    id: 40,
+    name: "PANT",
+    img: "https://menshub64.in/media/uploads/1780332271_WhatsApp_Image_2026-05-10_at_2.07.52_PM.jpeg"
+  },
+  {
+    id: 37,
+    name: "SHIRTS",
+    img: "https://menshub64.in/media/uploads/1780331187_WhatsApp_Image_2026-05-10_at_2.04.36_PM_1.jpeg"
+  },
+  {
+    id: 39,
+    name: "SHOE",
+    img: "https://menshub64.in/media/uploads/1780332245_WhatsApp_Image_2026-05-10_at_2.07.14_PM.jpeg"
+  },
+  {
+    id: 41,
+    name: "SHORTS/TRACK",
+    img: "https://menshub64.in/media/uploads/1780331369_WhatsApp_Image_2026-05-10_at_2.05.18_PM_1.jpeg"
+  },
+  {
+    id: 11,
+    name: "Stone Shirts",
+    img: "https://menshub64.in/media/uploads/1780243280_WhatsApp_Image_2026-05-10_at_2.05.36_PM_2.jpeg"
+  },
+  {
+    id: 38,
+    name: "T SHIRTS",
+    img: "https://menshub64.in/media/uploads/1780331222_WhatsApp_Image_2026-05-10_at_2.05.00_PM_1.jpeg"
+  },
+  {
+    id: 36,
+    name: "VESTI SHIRT COMBO",
+    img: "https://menshub64.in/media/uploads/1780331118_WhatsApp_Image_2026-05-10_at_2.06.06_PM.jpeg"
+  }
+];
+
+const INITIAL_BANNER = '{"desktop_url":"https://menshub64.in/media/uploads/1780328897_WhatsApp_Image_2026-05-31_at_8.01.01_PM_1.jpeg","mobile_url":"https://menshub64.in/media/uploads/1780333205_WhatsApp_Image_2026-05-31_at_8.01.01_PM.jpeg","desktop_zoom":105,"desktop_x":50,"desktop_y":15,"mobile_zoom":110,"mobile_x":0,"mobile_y":3}';
 
 
 /* ═══════════════════════════════════════════════
@@ -231,9 +643,30 @@ export default function App(): React.ReactElement {
   const notifyTabsToRefresh = () => {
     localStorage.setItem('refreshData', Date.now().toString());
   };
-  const [page, setPage] = useState<Page>({ name: "home" });
+  const [page, setPage] = useState<Page>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pageParam = params.get('page');
+    if (pageParam === 'policies') return { name: 'policies' };
+    if (pageParam === 'aboutus') return { name: 'aboutus' };
+    return { name: "home" };
+  });
 
-
+  // Listen for browser back/forward buttons and update page state accordingly
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const pageParam = params.get('page');
+      if (pageParam === 'policies') {
+        setPage({ name: 'policies' });
+      } else if (pageParam === 'aboutus') {
+        setPage({ name: 'aboutus' });
+      } else {
+        setPage({ name: 'home' });
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Listen for cross-tab updates (admin changes)
   useEffect(() => {
@@ -267,12 +700,15 @@ export default function App(): React.ReactElement {
     if (!user) setMigrationDone(false);
   }, [user, migrationDone]);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]); // Load from database on mount
-  const [categories, setCategories] = useState<Category[]>([]); // Load from database on mount
-  const [bannerImg, setBannerImg] = useState(""); // Default empty banner
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS); // Load from database on mount
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES); // Load from database on mount
+  const [bannerImg, setBannerImg] = useState(INITIAL_BANNER); // Default banner
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
-  const [dark, setDark] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [dark, setDark] = useState<boolean>(() => {
+    const saved = localStorage.getItem('theme');
+    return saved !== null ? saved === 'dark' : true;
+  });
+  const [loading, setLoading] = useState(false);
 
   // Load all data on app startup
   useEffect(() => {
@@ -405,10 +841,33 @@ export default function App(): React.ReactElement {
     }
   }, [user]);
 
-  useEffect(() => { document.documentElement.classList.toggle("dark", dark); }, [dark]);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
-  const navigate = (p: Page) => { setHistory((h: Page[]) => [...h, page]); setPage(p); window.scrollTo(0, 0); };
-  const back = () => setHistory((h: Page[]) => { if (!h.length) return h; const prev = h[h.length - 1]; setPage(prev); return h.slice(0, -1); });
+  const navigate = (p: Page) => {
+    setHistory((h: Page[]) => [...h, page]);
+    setPage(p);
+    window.scrollTo(0, 0);
+    if (p.name === 'policies' || p.name === 'aboutus') {
+      window.history.pushState(null, '', `?page=${p.name}`);
+    } else {
+      window.history.pushState(null, '', window.location.pathname);
+    }
+  };
+
+  const back = () => setHistory((h: Page[]) => {
+    if (!h.length) return h;
+    const prev = h[h.length - 1];
+    setPage(prev);
+    if (prev.name === 'policies' || prev.name === 'aboutus') {
+      window.history.pushState(null, '', `?page=${prev.name}`);
+    } else {
+      window.history.pushState(null, '', window.location.pathname);
+    }
+    return h.slice(0, -1);
+  });
 
   // Refresh data from database after admin changes
   const refreshDataFromDB = async () => {
@@ -459,9 +918,9 @@ export default function App(): React.ReactElement {
     action();
   };
 
-  const buyNow = (product: Product, size: string) => {
+  const buyNow = (product: Product, size: string, customColor?: string, customDesign?: string) => {
     requireAuth(() => {
-      navigate({ name: "checkout", directItem: { product, size, qty: 1 } });
+      navigate({ name: "checkout", directItem: { product, size, qty: 1, customColor, customDesign } });
     });
   };
 
@@ -469,12 +928,15 @@ export default function App(): React.ReactElement {
     requireAuth(() => setWishlist((w: string[]) => w.includes(id) ? w.filter((x: string) => x !== id) : [...w, id]));
   };
 
-  const addToCart = (product: Product, size: string) => {
+  const addToCart = (product: Product, size: string, customColor?: string, customDesign?: string) => {
     requireAuth(() => {
       const selectedSize = size || product.sizes[0] || "One";
       setCart((prevCart: CartItem[]) => {
         const existingIdx = prevCart.findIndex(
-          (item: CartItem) => item.product.id === product.id && item.size === selectedSize
+          (item: CartItem) => item.product.id === product.id && 
+                              item.size === selectedSize && 
+                              item.customColor === customColor && 
+                              item.customDesign === customDesign
         );
         if (existingIdx >= 0) {
           const newQty = prevCart[existingIdx].qty + 1;
@@ -488,7 +950,7 @@ export default function App(): React.ReactElement {
           return copy;
         } else {
           toast.success(`Added ${product.name} (${selectedSize}) to cart!`);
-          return [...prevCart, { product, size: selectedSize, qty: 1 }];
+          return [...prevCart, { product, size: selectedSize, qty: 1, customColor, customDesign }];
         }
       });
     });
@@ -548,6 +1010,9 @@ export default function App(): React.ReactElement {
               initialTab: "orders",
               initialOrderId: orderId
             });
+          }}
+          onNotificationReceived={() => {
+            fetchOrders();
           }}
         />
       )}
@@ -969,7 +1434,7 @@ function SearchOverlay({ products, onClose, onSelect, onSearch }: any) {
           {q && suggestions.length === 0 && <div className="py-8 text-center text-neutral-500">No products found</div>}
           {suggestions.map((p: Product) => (
             <button key={p.id} onClick={() => onSelect(p)} className="w-full flex items-center gap-3 p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900 rounded">
-              <img src={p.image_url || p.images?.[0] || ''} className="w-12 h-12 object-cover rounded" />
+              <img src={optimizeImageUrl(p.image_url || p.images?.[0] || '', 100)} className="w-12 h-12 object-cover rounded" />
               <div className="text-left flex-1"><div>{p.name}</div><div className="text-sm text-neutral-500">₹{p.price}</div></div>
               <ChevronRight size={16} />
             </button>
@@ -1382,13 +1847,67 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
   const validImages = images.filter((img: string) => img && img.trim() !== '');
   const displayImages = validImages.length > 0 ? validImages : [fallbackProduct];
 
+  const isStoneShirt = String(product.category) === '11' || String(product.category_name).toLowerCase() === 'stone shirts';
+  const [customColor, setCustomColor] = useState("");
+  const [customDesign, setCustomDesign] = useState("");
+
+  const colorsList = Array.isArray(product.color_patterns) && product.color_patterns.length > 0 
+    ? product.color_patterns 
+    : ["Yellow", "Green", "White", "Black", "Dark Yellow", "Navy Blue", "Red", "Grey", "Blue"];
+
+  const designsList = Array.isArray(product.custom_designs) ? product.custom_designs : [];
+
+  const colorMap: { [key: string]: string } = {
+    yellow: "#eab308",
+    green: "#22c55e",
+    white: "#ffffff",
+    black: "#000000",
+    "dark yellow": "#ca8a04",
+    "navy blue": "#1e3a8a",
+    red: "#ef4444",
+    grey: "#737373",
+    blue: "#3b82f6",
+    pink: "#ec4899",
+    orange: "#f97316",
+    purple: "#a855f7",
+    brown: "#78350f"
+  };
+
+  const handleAddToCart = () => {
+    if (isStoneShirt) {
+      if (!customColor) {
+        toast.error("Please select a Color pattern for your custom shirt");
+        return;
+      }
+      if (!customDesign) {
+        toast.error("Please select a Design style for your custom shirt");
+        return;
+      }
+    }
+    onAddToCart(product, size, customColor, customDesign);
+  };
+
+  const handleBuyNow = () => {
+    if (isStoneShirt) {
+      if (!customColor) {
+        toast.error("Please select a Color pattern for your custom shirt");
+        return;
+      }
+      if (!customDesign) {
+        toast.error("Please select a Design style for your custom shirt");
+        return;
+      }
+    }
+    onBuy(product, size, customColor, customDesign);
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4">
       <button onClick={onBack} className="my-4 flex items-center gap-1 text-sm"><ChevronLeft size={16} /> Back</button>
       <div className="grid md:grid-cols-2 gap-8">
         <div>
           <div className="relative aspect-[3/4] bg-neutral-100 dark:bg-neutral-900 rounded-xl overflow-hidden group">
-            <img src={displayImages[imgIdx]} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" onError={(e: any) => { e.target.src = fallbackProduct; }} />
+            <img src={optimizeImageUrl(displayImages[imgIdx], 600)} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" onError={(e: any) => { e.target.src = fallbackProduct; }} />
             {displayImages.length > 1 && (
               <>
                 <button onClick={() => setImgIdx((imgIdx - 1 + displayImages.length) % displayImages.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 dark:bg-neutral-900/90 flex items-center justify-center" aria-label="Previous image"><ChevronLeft size={18} /></button>
@@ -1400,7 +1919,7 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
             <div className="flex gap-2 mt-3">
               {displayImages.map((src: string, i: number) => (
                 <button key={i} onClick={() => setImgIdx(i)} className={`w-16 h-16 rounded overflow-hidden border-2 ${i === imgIdx ? "border-neutral-900 dark:border-white" : "border-transparent"}`}>
-                  <img src={src} className="w-full h-full object-cover" onError={(e: any) => { e.target.src = fallbackProduct; }} />
+                  <img src={optimizeImageUrl(src, 120)} className="w-full h-full object-cover" onError={(e: any) => { e.target.src = fallbackProduct; }} />
                 </button>
               ))}
             </div>
@@ -1412,6 +1931,105 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
           <div className="flex items-center gap-1 mt-2 text-neutral-500 text-sm">
             <Star size={14} className="fill-amber-500 text-amber-500" /> Premium Quality • Free Shipping
           </div>
+
+          {/* Color Pattern Customization Selector (Stone Shirts Only) */}
+          {isStoneShirt && (
+            <div className="mt-6">
+              <div className="text-sm uppercase tracking-wider mb-2">Select Color</div>
+              <div className="flex flex-wrap gap-2">
+                {colorsList.map((c: string) => {
+                  const hex = colorMap[c.toLowerCase()] || "#95a5a6";
+                  const isWhite = c.toLowerCase() === 'white';
+                  const isSelected = customColor === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCustomColor(c)}
+                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold uppercase transition-all duration-200 ${
+                        isSelected 
+                          ? "ring-2 ring-neutral-900 dark:ring-white scale-105" 
+                          : "opacity-85 hover:opacity-100"
+                      }`}
+                      style={{
+                        border: "1px solid var(--accent)",
+                        background: isSelected ? "var(--accent-grad)" : "transparent",
+                        color: isSelected ? "var(--accent-fg)" : "var(--accent-soft)",
+                        boxShadow: isSelected ? "0 4px 12px var(--accent-glow)" : "none"
+                      }}
+                    >
+                      <span 
+                        className={`w-3.5 h-3.5 rounded-full inline-block ${isWhite ? "border border-neutral-300" : ""}`}
+                        style={{ backgroundColor: hex }}
+                      />
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Design Templates Customization Selector (Stone Shirts Only) */}
+          {isStoneShirt && (
+            <div className="mt-6">
+              <div className="text-sm uppercase tracking-wider mb-2">Select Design</div>
+              {designsList.length === 0 ? (
+                <div className="text-xs text-neutral-500 py-3 px-4 rounded-lg bg-neutral-100 dark:bg-neutral-900">
+                  Contact us on WhatsApp for available designs!
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 md:grid-cols-5 gap-2">
+                  {designsList.map((src: string, i: number) => {
+                    const isSelected = customDesign === src;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setCustomDesign(src)}
+                        className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-105 ${
+                          isSelected 
+                            ? "border-neutral-900 dark:border-white ring-2 ring-amber-500" 
+                            : "border-transparent"
+                        }`}
+                        style={{ border: isSelected ? "2px solid var(--accent)" : "2px solid transparent" }}
+                      >
+                        <img src={optimizeImageUrl(src, 120)} className="w-full h-full object-cover" />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-neutral-950/20 flex items-center justify-center">
+                            <span className="bg-amber-500 text-neutral-950 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">✓</span>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Customization Details Banner (Stone Shirts Only) */}
+          {isStoneShirt && (
+            <div className="mt-6 p-4 rounded-xl border space-y-2" style={{ borderColor: "var(--accent)", background: "rgba(212,175,55,0.05)" }}>
+              <div className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">✨ Customization & Pre-Booking Available</div>
+              <p className="text-xs leading-relaxed opacity-95" style={{ fontWeight: 600 }}>
+                We can do CUSTOMIZATION IN PARTYWEAR SHIRTS FROM SIZE 1 YEAR TO 5XL ... WITHIN 5DAYS TO 7DAYS DELIVERY TIME
+              </p>
+              <div className="text-xs pt-1 opacity-90">
+                For more designs and colours do connect with WhatsApp with us @9524097865:
+                <a 
+                  href="https://wa.me/919524097865" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="ml-1 font-bold underline hover:opacity-85" 
+                  style={{ color: "var(--accent)" }}
+                >
+                  +91 95240 97865
+                </a>
+              </div>
+            </div>
+          )}
+
           <div className="mt-6">
             <div className="text-sm uppercase tracking-wider mb-2">Size</div>
             <div className="flex flex-wrap gap-2">
@@ -1422,9 +2040,9 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
             </div>
           </div>
           <div className="flex gap-3 mt-8">
-            <button onClick={() => onAddToCart(product, size)} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90"
+            <button onClick={handleAddToCart} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90"
               style={{ border: "1px solid var(--accent)", color: "var(--accent)", background: "transparent" }}>Add to Cart</button>
-            <button onClick={() => onBuy(product, size)} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90"
+            <button onClick={handleBuyNow} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90"
               style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>Buy Now</button>
             <button onClick={() => onWish(product.id)} className="px-4 border border-neutral-300 dark:border-neutral-700 flex items-center justify-center rounded-md transition hover:scale-105" aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}>
               <Heart size={20} className={wished ? "fill-red-500 text-red-500" : ""} />
@@ -1467,10 +2085,17 @@ function CartPage({ cart, setCart, onCheckout, onBack, total }: any) {
           const imageSrc = item.product.image_url || (Array.isArray(item.product.images) && item.product.images[0]) || fallbackProduct;
           return (
             <div key={i} className="flex gap-4 p-3 border border-neutral-200 dark:border-neutral-800 rounded-xl">
-              <img src={imageSrc} className="w-20 h-24 object-cover rounded" onError={(e: any) => { e.target.src = fallbackProduct; }} />
+              <img src={optimizeImageUrl(imageSrc, 120)} className="w-20 h-24 object-cover rounded" onError={(e: any) => { e.target.src = fallbackProduct; }} />
               <div className="flex-1">
                 <div>{item.product.name}</div>
                 <div className="text-sm text-neutral-500">Size: {item.size}</div>
+                {item.customColor && <div className="text-xs text-neutral-500 mt-0.5">Color: {item.customColor}</div>}
+                {item.customDesign && (
+                  <div className="text-xs text-neutral-500 flex items-center gap-1.5 mt-1">
+                    <span>Design:</span>
+                    <img src={optimizeImageUrl(item.customDesign, 60)} className="w-8 h-10 object-cover rounded border border-neutral-300 dark:border-neutral-700" />
+                  </div>
+                )}
                 <div className="mt-1">₹{(item.product.price * item.qty).toLocaleString()}</div>
               </div>
               <div className="flex flex-col items-end justify-between">
@@ -1567,6 +2192,8 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
         qty: item.qty,
         size: item.size,
         product_id: item.product.id,
+        customColor: item.customColor || null,
+        customDesign: item.customDesign || null,
       }));
 
       console.log('Creating pending order on backend:', orderItems);
@@ -2236,6 +2863,13 @@ function OrdersPage({ user, onBack }: any) {
                     <div>
                       <p className="font-medium">{item.name}</p>
                       <p className="text-sm text-neutral-500">Size: {item.size} | Qty: {item.qty}</p>
+                      {item.customColor && <p className="text-xs text-neutral-500 mt-0.5">Color: {item.customColor}</p>}
+                      {item.customDesign && (
+                        <div className="text-xs text-neutral-500 flex items-center gap-1.5 mt-1">
+                          <span>Design:</span>
+                          <img src={optimizeImageUrl(item.customDesign, 60)} className="w-8 h-10 object-cover rounded border border-neutral-300 dark:border-neutral-700" />
+                        </div>
+                      )}
                     </div>
                     {item.price && <p className="font-semibold">₹{(item.price * item.qty).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>}
                   </div>
@@ -2339,7 +2973,7 @@ function OrdersPage({ user, onBack }: any) {
               </p>
               <button
                 onClick={() => {
-                  const adminPhone = "919524097865";
+                  const adminPhone = "917397231852";
                   const orderNum = selectedOrder.order_number || selectedOrder.id;
                   const customerName = selectedOrder.customer_name || selectedOrder.customer?.name || "Customer";
                   const customerPhone = selectedOrder.phone || selectedOrder.customer?.phone || "N/A";
@@ -2928,9 +3562,6 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
   useEffect(() => {
     if (tab === 'orders') {
       fetchOrders();
-      // Auto-refresh every 10 seconds
-      const interval = setInterval(fetchOrders, 10000);
-      return () => clearInterval(interval);
     }
   }, [tab]);
 
@@ -2981,7 +3612,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                 const imageSrc = p.image_url || (Array.isArray(p.images) && p.images[0]) || fallbackProduct;
                 return (
                   <div key={p.id} className="flex items-center gap-3 p-3 border border-neutral-200 dark:border-neutral-800 rounded-xl">
-                    <img src={imageSrc} className="w-14 h-14 object-cover rounded-lg" onError={(e: any) => { e.target.src = fallbackProduct; }} />
+                    <img src={optimizeImageUrl(imageSrc, 100)} className="w-14 h-14 object-cover rounded-lg" onError={(e: any) => { e.target.src = fallbackProduct; }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span style={{ fontWeight: 600 }}>{p.name}</span>
@@ -3050,7 +3681,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                   onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
                   <div className="relative h-32">
-                    <img src={c.img} className="w-full h-full object-cover" onError={(e: any) => { e.target.style.display = "none"; }} />
+                    <img src={optimizeImageUrl(c.img, 150)} className="w-full h-full object-cover" onError={(e: any) => { e.target.style.display = "none"; }} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className="absolute bottom-2 left-3 text-white uppercase tracking-wider text-sm" style={{ fontWeight: 600 }}>{c.name}</div>
                   </div>
@@ -3461,8 +4092,17 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                       return (
                         <tr key={idx} className="border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50">
                           <td className="p-3 flex items-center gap-3">
-                            <img src={imgUrl} className="w-10 h-10 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800" onError={(e: any) => e.target.src = fallbackImg} />
-                            <span className="font-semibold">{item.name || item.product_name}</span>
+                            <img src={optimizeImageUrl(imgUrl, 80)} className="w-10 h-10 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800 shrink-0" onError={(e: any) => e.target.src = fallbackImg} />
+                            <div>
+                              <div className="font-semibold">{item.name || item.product_name}</div>
+                              {item.customColor && <div className="text-[10px] text-neutral-500 mt-0.5">Color: {item.customColor}</div>}
+                              {item.customDesign && (
+                                <div className="text-[10px] text-neutral-500 flex items-center gap-1.5 mt-1">
+                                  <span>Design:</span>
+                                  <img src={optimizeImageUrl(item.customDesign, 60)} className="w-6 h-8 object-cover rounded border border-neutral-300 dark:border-neutral-700" />
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3 text-center font-semibold font-mono">{item.size || 'N/A'}</td>
                           <td className="p-3 text-center font-semibold">{itemQty}</td>
@@ -3581,13 +4221,57 @@ function SizeCustomInput({ onAdd }: { onAdd: (s: string) => void }) {
   );
 }
 
+/* ─────────────────── Color Custom Input ─────────────────── */
+function ColorCustomInput({ onAdd }: { onAdd: (c: string) => void }) {
+  const [val, setVal] = useState("");
+  const submit = () => { const v = val.trim(); if (v) { onAdd(v); setVal(""); } };
+  return (
+    <div className="flex gap-2 mt-1">
+      <input value={val} onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
+        placeholder="Custom color (e.g. Lavender, Maroon)"
+        className="flex-1 px-2 py-1.5 text-xs border border-neutral-300 dark:border-neutral-700 rounded bg-transparent" />
+      <button type="button" onClick={submit}
+        className="px-3 py-1.5 text-xs rounded uppercase tracking-wider"
+        style={{ background: "var(--accent-grad)", color: "var(--accent-fg)", fontWeight: 600 }}>
+        + Add
+      </button>
+    </div>
+  );
+}
+
 /* ─────────────────── Product Editor ─────────────────── */
 function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefresh }: any) {
   const [p, setP] = useState<Product>({ ...product });
   const [preview, setPreview] = useState(product.image_url || product.images?.[0] || "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingDesign, setUploadingDesign] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const designFileRef = useRef<HTMLInputElement>(null);
+
+  const isStoneShirt = String(p.category) === "11" || p.category === 11;
+
+  const PRESET_COLORS = ["Yellow", "Green", "White", "Black", "Dark Yellow", "Navy Blue", "Red", "Grey", "Blue", "Pink", "Orange", "Purple", "Brown"];
+
+  const getColorHex = (c: string): string => {
+    const colorMap: { [key: string]: string } = {
+      yellow: "#eab308",
+      green: "#22c55e",
+      white: "#ffffff",
+      black: "#000000",
+      "dark yellow": "#ca8a04",
+      "navy blue": "#1e3a8a",
+      red: "#ef4444",
+      grey: "#737373",
+      blue: "#3b82f6",
+      pink: "#ec4899",
+      orange: "#f97316",
+      purple: "#a855f7",
+      brown: "#78350f"
+    };
+    return colorMap[c.toLowerCase()] || "#95a5a6";
+  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3610,6 +4294,42 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleDesignUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const currentDesigns = p.custom_designs || [];
+    if (currentDesigns.length + files.length > 15) {
+      toast.error("You can upload a maximum of 15 custom designs.");
+      return;
+    }
+
+    setUploadingDesign(true);
+    let successCount = 0;
+    const uploadedUrls: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const url = await adminService.uploadImage(file);
+        uploadedUrls.push(url);
+        successCount++;
+      } catch (err: any) {
+        console.error("Design upload failed:", err);
+        toast.error(`Failed to upload design image ${i + 1}: ${err.message || 'Error'}`);
+      }
+    }
+
+    if (successCount > 0) {
+      setP((prev: Product) => ({
+        ...prev,
+        custom_designs: [...(prev.custom_designs || []), ...uploadedUrls]
+      }));
+      toast.success(`Successfully uploaded ${successCount} design image(s)`);
+    }
+    setUploadingDesign(false);
   };
 
   const handleSave = () => {
@@ -3707,19 +4427,131 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
               {/* Custom size input */}
               <SizeCustomInput onAdd={(s: string) => { if (s && !p.sizes.includes(s)) setP({ ...p, sizes: [...p.sizes, s] }); }} />
             </div>
+
+            {/* Custom Designs & Color Swatches Manager (Stone Shirts category ID 11 only) */}
+            {isStoneShirt && (
+              <>
+                {/* Custom Designs Manager */}
+                <div className="rounded-xl p-3 space-y-3 animate-fade-in" style={{ border: "1px solid var(--accent)" }}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs uppercase tracking-wider font-semibold" style={{ color: "var(--accent)" }}>
+                      Custom Designs ({p.custom_designs?.length || 0}/15)
+                    </span>
+                    {uploadingDesign && <span className="text-[10px] animate-pulse text-amber-500 font-semibold">Uploading...</span>}
+                  </div>
+
+                  {/* Designs Grid */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {p.custom_designs?.map((designUrl, index) => (
+                      <div key={index} className="relative group aspect-[3/4] rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900">
+                        <img src={optimizeImageUrl(designUrl, 120)} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setP((prev: Product) => ({
+                              ...prev,
+                              custom_designs: prev.custom_designs?.filter((_, idx) => idx !== index) || []
+                            }));
+                          }}
+                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition flex items-center justify-center"
+                          title="Remove design"
+                          style={{ width: "16px", height: "16px" }}
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Add Design Upload Trigger */}
+                    {(!p.custom_designs || p.custom_designs.length < 15) && (
+                      <button
+                        type="button"
+                        onClick={() => !uploadingDesign && designFileRef.current?.click()}
+                        className="flex flex-col items-center justify-center border-2 border-dashed border-neutral-300 dark:border-neutral-700 rounded-lg aspect-[3/4] cursor-pointer hover:border-neutral-400 dark:hover:border-neutral-500 transition w-full"
+                        style={{ borderStyle: "dashed" }}
+                        disabled={uploadingDesign}
+                      >
+                        <Plus size={16} style={{ color: "var(--accent)" }} />
+                        <span className="text-[9px] mt-1 text-center font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">Add Design</span>
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={designFileRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleDesignUpload}
+                    disabled={uploadingDesign}
+                  />
+                </div>
+
+                {/* Color Swatches Selector */}
+                <div className="rounded-xl p-3 space-y-3 animate-fade-in" style={{ border: "1px solid var(--accent)" }}>
+                  <div className="text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: "var(--accent)" }}>
+                    Color Patterns
+                  </div>
+
+                  {/* Predefined Colors Swatches */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRESET_COLORS.map(color => {
+                      const isSelected = p.color_patterns?.includes(color);
+                      const hex = getColorHex(color);
+                      const isWhite = color.toLowerCase() === 'white';
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => {
+                            const current = p.color_patterns || [];
+                            const updated = isSelected 
+                              ? current.filter(c => c !== color) 
+                              : [...current, color];
+                            setP((prev: Product) => ({ ...prev, color_patterns: updated }));
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border transition"
+                          style={{
+                            borderColor: "var(--accent)",
+                            background: isSelected ? "var(--accent-grad)" : "transparent",
+                            color: isSelected ? "var(--accent-fg)" : "var(--accent-soft)",
+                          }}
+                        >
+                          <span 
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${isWhite ? "border border-neutral-300" : ""}`} 
+                            style={{ backgroundColor: hex }}
+                          />
+                          {color}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Color Input */}
+                  <ColorCustomInput 
+                    onAdd={(color) => {
+                      const current = p.color_patterns || [];
+                      if (color && !current.includes(color)) {
+                        setP((prev: Product) => ({ ...prev, color_patterns: [...current, color] }));
+                      }
+                    }} 
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         {/* Footer Buttons */}
         <div className="flex gap-2 p-6 pt-4 border-t border-neutral-200 dark:border-neutral-800 sticky bottom-0 bg-white dark:bg-neutral-950">
-          <button onClick={onCancel} disabled={saving || uploading} className="flex-1 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-sm uppercase tracking-wider hover:opacity-70 transition disabled:opacity-50">Cancel</button>
+          <button onClick={onCancel} disabled={saving || uploading || uploadingDesign} className="flex-1 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-sm uppercase tracking-wider hover:opacity-70 transition disabled:opacity-50">Cancel</button>
           <button
             onClick={handleSave}
-            disabled={saving || uploading}
+            disabled={saving || uploading || uploadingDesign}
             className="flex-1 py-2 rounded-lg text-sm uppercase tracking-wider transition disabled:opacity-50"
             style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}
           >
-            {saving ? "Saving..." : uploading ? "Uploading..." : "Save"}
+            {saving ? "Saving..." : uploading || uploadingDesign ? "Uploading..." : "Save"}
           </button>
         </div>
       </div>
@@ -4102,7 +4934,7 @@ function Footer({ onNavigate }: any) {
       <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <img src={logoImg} alt="Mens Hub" className="h-10 w-10 rounded-lg object-cover object-top" style={{ boxShadow: "0 0 0 1.5px var(--accent)" }} />
+            <img src={logoImg} alt="Mens Hub" width="40" height="40" className="h-10 w-10 rounded-lg object-cover object-top" style={{ boxShadow: "0 0 0 1.5px var(--accent)" }} />
             <span className="tracking-[0.25em] uppercase" style={{ fontWeight: 700, color: "var(--accent)" }}>Mens Hub</span>
           </div>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">Premium MensHub for the modern gentleman.
@@ -4114,8 +4946,8 @@ function Footer({ onNavigate }: any) {
             <button onClick={() => onNavigate({ name: "aboutus" })} className="hover:underline cursor-pointer text-left block text-neutral-700 dark:text-neutral-300">About Us</button>
             <button onClick={() => onNavigate({ name: "policies" })} className="hover:underline cursor-pointer text-left block text-neutral-700 dark:text-neutral-300">Policies</button>
             <a href={CONFIG.MAPS_URL} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 hover:underline cursor-pointer"><MapPin size={14} className="mt-0.5 shrink-0" /> 13, Aruppukottai Main Rd, South Gate, Mahalipatti, Madurai, Tamil Nadu 625001, India</a>
-            <a href="tel:+919524097865" className="flex items-center gap-2 hover:underline"><Phone size={14} className="shrink-0" /> +91 95240 97865</a>
-            <a href="mailto:menshubadmin01@gmail.com" className="flex items-center gap-2 hover:underline"><Mail size={14} className="shrink-0" /> menshubadmin01@gmail.com</a>
+            <a href="tel:+917397231852" className="flex items-center gap-2 hover:underline"><Phone size={14} className="shrink-0" /> +91 73972 31852</a>
+            <a href="mailto:mubarakstr003@gmail.com" className="flex items-center gap-2 hover:underline"><Mail size={14} className="shrink-0" /> mubarakstr003@gmail.com</a>
           </div>
         </div>
         <div>
@@ -4159,7 +4991,6 @@ function BottomNav({ active, onHome, onCategories, onWishlist, onCart, onOrders,
     { key: "home", icon: Home, label: "Home", action: onHome },
     { key: "categories", icon: Grid3x3, label: "Category", action: onCategories },
     { key: "wishlist", icon: Heart, label: "Wishlist", action: onWishlist },
-    { key: "cart", icon: ShoppingBag, label: "Cart", action: onCart, badge: cartCount },
     { key: "orders", icon: Package, label: "Orders", action: onOrders },
     { key: "dark", icon: dark ? Sun : Moon, label: dark ? "Light" : "Dark", action: toggleDark },
   ];

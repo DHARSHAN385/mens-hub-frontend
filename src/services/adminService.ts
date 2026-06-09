@@ -195,7 +195,7 @@ export const saveProduct = async (product: any): Promise<any> => {
       console.warn('⚠ Skipping base64 image (too large), saving without image');
       image = '';
     }
-    const backendProduct: AdminProduct & { images?: string[] } = {
+    const backendProduct: AdminProduct & { images?: string[]; custom_designs?: string[]; color_patterns?: string[] } = {
       name: product.name,
       description: product.description || product.name, 
       price: Number(product.price),
@@ -205,7 +205,9 @@ export const saveProduct = async (product: any): Promise<any> => {
       sizes: product.sizes || [],
       popularity: product.popularity || 0,
       featured: product.featured || false,
-      images: Array.isArray(product.images) ? product.images.filter((img: string) => img && !img.startsWith('data:image/')) : []
+      images: Array.isArray(product.images) ? product.images.filter((img: string) => img && !img.startsWith('data:image/')) : [],
+      custom_designs: Array.isArray(product.custom_designs) ? product.custom_designs.filter((img: string) => img && !img.startsWith('data:image/')) : [],
+      color_patterns: Array.isArray(product.color_patterns) ? product.color_patterns : []
     };
 
     // Update existing product (only if ID is numeric)
@@ -219,7 +221,9 @@ export const saveProduct = async (product: any): Promise<any> => {
           return {
             ...response,
             image_url: processImageUrl(response.image_url),
-            images: Array.isArray(response.images) ? response.images.map(processImageUrl) : [processImageUrl(response.image_url)]
+            images: Array.isArray(response.images) ? response.images.map(processImageUrl) : [processImageUrl(response.image_url)],
+            custom_designs: Array.isArray(response.custom_designs) ? response.custom_designs.map(processImageUrl) : [],
+            color_patterns: Array.isArray(response.color_patterns) ? response.color_patterns : []
           };
         } else {
           console.warn('⚠️ Backend returned invalid/empty product object, falling back to previous:', response);
@@ -238,7 +242,9 @@ export const saveProduct = async (product: any): Promise<any> => {
           return {
             ...response,
             image_url: processImageUrl(response.image_url),
-            images: Array.isArray(response.images) ? response.images.map(processImageUrl) : [processImageUrl(response.image_url)]
+            images: Array.isArray(response.images) ? response.images.map(processImageUrl) : [processImageUrl(response.image_url)],
+            custom_designs: Array.isArray(response.custom_designs) ? response.custom_designs.map(processImageUrl) : [],
+            color_patterns: Array.isArray(response.color_patterns) ? response.color_patterns : []
           };
         } else {
           console.warn('⚠️ Backend returned invalid/empty product object, falling back to previous:', response);
@@ -377,7 +383,9 @@ export const loadProductsFromDB = async (forceRefresh = false): Promise<any[]> =
     const transformed = data.map((p: any) => ({
       ...p,
       image_url: processImageUrl(p.image_url),
-      images: Array.isArray(p.images) ? p.images.map(processImageUrl) : [processImageUrl(p.image_url)]
+      images: Array.isArray(p.images) ? p.images.map(processImageUrl) : [processImageUrl(p.image_url)],
+      custom_designs: Array.isArray(p.custom_designs) ? p.custom_designs.map(processImageUrl) : [],
+      color_patterns: Array.isArray(p.color_patterns) ? p.color_patterns : []
     }));
     console.log(`✅ Successfully loaded ${transformed.length} products from DATABASE`);
     productsCache = transformed;

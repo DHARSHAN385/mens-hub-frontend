@@ -17,7 +17,7 @@ interface DecodedToken {
 }
 
 // Admin email configuration
-const ADMIN_EMAIL = 'menshubadmin01@gmail.com';
+const ADMIN_EMAIL = 'mubarakstr003@gmail.com';
 
 export const GoogleLogin: React.FC<GoogleLoginProps> = ({
   onSuccess,
