@@ -138,6 +138,16 @@ export function optimizeImageUrl(url: string, width: number): string {
 
 export function getColorHex(c: string): string {
   if (!c) return "#95a5a6";
+  
+  // If the string contains '|', check if the second part is a valid hex code
+  if (c.includes('|')) {
+    const parts = c.split('|');
+    const rightSide = parts[1]?.trim();
+    if (rightSide && /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(rightSide)) {
+      return rightSide;
+    }
+  }
+
   const clean = c.split('|')[0].toLowerCase().trim();
   const colorMap: { [key: string]: string } = {
     yellow: "#eab308",
@@ -4330,25 +4340,6 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
 
   const PRESET_COLORS = ["Yellow", "Green", "White", "Black", "Dark Yellow", "Navy Blue", "Red", "Grey", "Blue", "Pink", "Orange", "Purple", "Brown"];
 
-  const getColorHex = (c: string): string => {
-    const colorMap: { [key: string]: string } = {
-      yellow: "#eab308",
-      green: "#22c55e",
-      white: "#ffffff",
-      black: "#000000",
-      "dark yellow": "#ca8a04",
-      "navy blue": "#1e3a8a",
-      red: "#ef4444",
-      grey: "#737373",
-      blue: "#3b82f6",
-      pink: "#ec4899",
-      orange: "#f97316",
-      purple: "#a855f7",
-      brown: "#78350f"
-    };
-    return colorMap[c.toLowerCase()] || "#95a5a6";
-  };
-
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -4569,12 +4560,13 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
                     Color Patterns
                   </div>
 
-                  {/* Predefined Colors Swatches */}
+                  {/* Predefined & Custom Colors Swatches */}
                   <div className="flex flex-wrap gap-1.5">
-                    {PRESET_COLORS.map(color => {
+                    {Array.from(new Set([...PRESET_COLORS, ...(p.color_patterns || [])])).map(color => {
                       const isSelected = p.color_patterns?.includes(color);
-                      const hex = getColorHex(color);
-                      const isWhite = color.toLowerCase() === 'white';
+                      const [colorName, colorHex] = color.split('|');
+                      const hex = colorHex || getColorHex(colorName);
+                      const isWhite = colorName.toLowerCase() === 'white';
                       return (
                         <button
                           key={color}
@@ -4597,7 +4589,7 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
                             className={`w-2.5 h-2.5 rounded-full shrink-0 ${isWhite ? "border border-neutral-300" : ""}`} 
                             style={{ backgroundColor: hex }}
                           />
-                          {color}
+                          {colorName}
                         </button>
                       );
                     })}
