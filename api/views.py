@@ -58,7 +58,7 @@ class IsAdminOrReadOnly(BasePermission):
             return bool(profile.is_admin)
         except UserProfile.DoesNotExist:
             # If no profile exists, check if user email matches admin emails
-            admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com']
+            admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com', 'mubarakstr003@gmail.com']
             return request.user.email in admin_emails
 
 
@@ -228,7 +228,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
         except UserProfile.DoesNotExist:
-            admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com']
+            admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com', 'mubarakstr003@gmail.com']
             if request.user.email not in admin_emails:
                 return Response(
                     {'error': 'Admin access required'},
@@ -1094,7 +1094,7 @@ def google_oauth_login(request):
         # Create or update user profile for Google users
         from .models import UserProfile
         # Admin emails - add all authorized admin emails here
-        admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com']
+        admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com', 'mubarakstr003@gmail.com']
         is_admin = email in admin_emails
         
         try:
@@ -1304,7 +1304,7 @@ def login_user(request):
         
         # Get or create user profile
         from .models import UserProfile
-        admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com']
+        admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com', 'mubarakstr003@gmail.com']
         is_admin = user.is_staff or email in admin_emails
         
         profile, created = UserProfile.objects.get_or_create(user=user)
