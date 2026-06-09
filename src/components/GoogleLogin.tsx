@@ -16,8 +16,8 @@ interface DecodedToken {
   picture?: string;
 }
 
-// Admin email configuration
-const ADMIN_EMAIL = 'mubarakstr003@gmail.com';
+// Admin emails configuration
+const ADMIN_EMAILS = ['menshubadmin01@gmail.com', 'mubarakstr003@gmail.com'];
 
 export const GoogleLogin: React.FC<GoogleLoginProps> = ({
   onSuccess,
@@ -92,7 +92,7 @@ export const GoogleLogin: React.FC<GoogleLoginProps> = ({
       debug('Backend response successful', { token: data.token?.substring(0, 20) + '...' });
 
       // Check if this is the admin email
-      const isAdmin = data.user.email === ADMIN_EMAIL;
+      const isAdmin = ADMIN_EMAILS.includes(data.user.email);
       debug('User email', data.user.email);
       debug('Is admin', isAdmin);
 

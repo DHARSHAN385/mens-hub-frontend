@@ -64,8 +64,8 @@ export default function Policies({ onBack }: { onBack: () => void }) {
         </p>
         <div className="text-sm text-neutral-700 dark:text-neutral-300 space-y-2 bg-neutral-100 dark:bg-neutral-900 p-4 rounded-lg">
           <p><strong>Merchant Name:</strong> Mens Hub</p>
-          <p><strong>Support Email:</strong> mubarakstr003@gmail.com</p>
-          <p><strong>Contact Phone:</strong> +91 73972 31852</p>
+          <p><strong>Support Email:</strong> menshubadmin01@gmail.com or mubarakstr003@gmail.com</p>
+          <p><strong>Contact Phone:</strong> +91 95240 97865 or +91 73972 31852</p>
           <p><strong>Registered Address:</strong> 13, Aruppukottai Main Rd, South Gate, South Gate, Mahalipatti, Madurai, Tamil Nadu 625001, India</p>
         </div>
       </section>

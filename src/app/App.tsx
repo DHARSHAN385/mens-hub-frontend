@@ -3053,7 +3053,7 @@ function OrdersPage({ user, onBack }: any) {
               </p>
               <button
                 onClick={() => {
-                  const adminPhone = "917397231852";
+                  const adminPhone = "919524097865";
                   const orderNum = selectedOrder.order_number || selectedOrder.id;
                   const customerName = selectedOrder.customer_name || selectedOrder.customer?.name || "Customer";
                   const customerPhone = selectedOrder.phone || selectedOrder.customer?.phone || "N/A";
@@ -5096,8 +5096,8 @@ function Footer({ onNavigate }: any) {
             <button onClick={() => onNavigate({ name: "aboutus" })} className="hover:underline cursor-pointer text-left block text-neutral-700 dark:text-neutral-300">About Us</button>
             <button onClick={() => onNavigate({ name: "policies" })} className="hover:underline cursor-pointer text-left block text-neutral-700 dark:text-neutral-300">Policies</button>
             <a href={CONFIG.MAPS_URL} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 hover:underline cursor-pointer"><MapPin size={14} className="mt-0.5 shrink-0" /> 13, Aruppukottai Main Rd, South Gate, Mahalipatti, Madurai, Tamil Nadu 625001, India</a>
-            <a href="tel:+917397231852" className="flex items-center gap-2 hover:underline"><Phone size={14} className="shrink-0" /> +91 73972 31852</a>
-            <a href="mailto:mubarakstr003@gmail.com" className="flex items-center gap-2 hover:underline"><Mail size={14} className="shrink-0" /> mubarakstr003@gmail.com</a>
+            <a href="tel:+919524097865" className="flex items-center gap-2 hover:underline"><Phone size={14} className="shrink-0" /> +91 95240 97865 / +91 73972 31852</a>
+            <a href="mailto:menshubadmin01@gmail.com" className="flex items-center gap-2 hover:underline"><Mail size={14} className="shrink-0" /> menshubadmin01@gmail.com / mubarakstr003@gmail.com</a>
           </div>
         </div>
         <div>
