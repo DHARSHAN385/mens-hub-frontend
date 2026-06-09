@@ -706,26 +706,52 @@ export default function App(): React.ReactElement {
   const notifyTabsToRefresh = () => {
     localStorage.setItem('refreshData', Date.now().toString());
   };
-  const [page, setPage] = useState<Page>(() => {
-    const params = new URLSearchParams(window.location.search);
+  const getPageFromUrl = (searchString: string): Page => {
+    const params = new URLSearchParams(searchString);
     const pageParam = params.get('page');
-    if (pageParam === 'policies') return { name: 'policies' };
-    if (pageParam === 'aboutus') return { name: 'aboutus' };
-    return { name: "home" };
+    if (!pageParam) return { name: "home" };
+
+    switch (pageParam) {
+      case 'policies': return { name: 'policies' };
+      case 'aboutus': return { name: 'aboutus' };
+      case 'categories': return { name: 'categories' };
+      case 'category': {
+        const id = params.get('id') || '';
+        return { name: 'category', id };
+      }
+      case 'product': {
+        const id = params.get('id') || '';
+        return { name: 'product', id };
+      }
+      case 'search': {
+        const query = params.get('query') || '';
+        return { name: 'search', query };
+      }
+      case 'cart': return { name: 'cart' };
+      case 'checkout': return { name: 'checkout' };
+      case 'login': return { name: 'login' };
+      case 'wishlist': return { name: 'wishlist' };
+      case 'orders': return { name: 'orders' };
+      case 'notifications': return { name: 'notifications' };
+      case 'allproducts': return { name: 'allproducts' };
+      case 'admin': {
+        const initialTab = params.get('tab') || undefined;
+        const orderIdStr = params.get('orderId');
+        const initialOrderId = orderIdStr ? parseInt(orderIdStr) || orderIdStr : undefined;
+        return { name: 'admin', initialTab, initialOrderId };
+      }
+      default: return { name: "home" };
+    }
+  };
+
+  const [page, setPage] = useState<Page>(() => {
+    return getPageFromUrl(window.location.search);
   });
 
   // Listen for browser back/forward buttons and update page state accordingly
   useEffect(() => {
     const handlePopState = () => {
-      const params = new URLSearchParams(window.location.search);
-      const pageParam = params.get('page');
-      if (pageParam === 'policies') {
-        setPage({ name: 'policies' });
-      } else if (pageParam === 'aboutus') {
-        setPage({ name: 'aboutus' });
-      } else {
-        setPage({ name: 'home' });
-      }
+      setPage(getPageFromUrl(window.location.search));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -913,21 +939,54 @@ export default function App(): React.ReactElement {
     setHistory((h: Page[]) => [...h, page]);
     setPage(p);
     window.scrollTo(0, 0);
-    if (p.name === 'policies' || p.name === 'aboutus') {
-      window.history.pushState(null, '', `?page=${p.name}`);
-    } else {
+    
+    if (p.name === 'home') {
       window.history.pushState(null, '', window.location.pathname);
+    } else {
+      const params = new URLSearchParams();
+      params.set('page', p.name);
+      if (p.name === 'product' && 'id' in p) {
+        params.set('id', p.id);
+      } else if (p.name === 'category' && 'id' in p) {
+        params.set('id', p.id);
+      } else if (p.name === 'search' && 'query' in p) {
+        params.set('query', p.query);
+      } else if (p.name === 'admin' && 'initialTab' in p && p.initialTab) {
+        params.set('tab', p.initialTab);
+        if (p.initialOrderId) {
+          params.set('orderId', String(p.initialOrderId));
+        }
+      }
+      window.history.pushState(null, '', `?${params.toString()}`);
     }
   };
 
   const back = () => setHistory((h: Page[]) => {
-    if (!h.length) return h;
+    if (!h.length) {
+      setPage({ name: 'home' });
+      window.history.pushState(null, '', window.location.pathname);
+      return h;
+    }
     const prev = h[h.length - 1];
     setPage(prev);
-    if (prev.name === 'policies' || prev.name === 'aboutus') {
-      window.history.pushState(null, '', `?page=${prev.name}`);
-    } else {
+    if (prev.name === 'home') {
       window.history.pushState(null, '', window.location.pathname);
+    } else {
+      const params = new URLSearchParams();
+      params.set('page', prev.name);
+      if (prev.name === 'product' && 'id' in prev) {
+        params.set('id', prev.id);
+      } else if (prev.name === 'category' && 'id' in prev) {
+        params.set('id', prev.id);
+      } else if (prev.name === 'search' && 'query' in prev) {
+        params.set('query', prev.query);
+      } else if (prev.name === 'admin' && 'initialTab' in prev && prev.initialTab) {
+        params.set('tab', prev.initialTab);
+        if (prev.initialOrderId) {
+          params.set('orderId', String(prev.initialOrderId));
+        }
+      }
+      window.history.pushState(null, '', `?${params.toString()}`);
     }
     return h.slice(0, -1);
   });
@@ -1141,7 +1200,7 @@ export default function App(): React.ReactElement {
             onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} onAddToCart={addToCart} />
         )}
         {page.name === "product" && (
-          <ProductPage product={products.find((p: Product) => p.id === (page as any).id)!}
+          <ProductPage product={products.find((p: Product) => p.id === (page as any).id)}
             onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} onAddToCart={addToCart} />
         )}
         {page.name === "cart" && (
@@ -1150,13 +1209,28 @@ export default function App(): React.ReactElement {
             onBack={back} total={cartTotal} />
         )}
         {page.name === "checkout" && (
-          <CheckoutPage
-            cart={(page as any).directItem ? [(page as any).directItem] : cart}
-            total={(page as any).directItem ? (page as any).directItem.product.price * (page as any).directItem.qty : cartTotal}
-            user={user}
-            onPlaced={handleOrderPlaced}
-            onBack={back}
-          />
+          user ? (
+            <CheckoutPage
+              cart={(page as any).directItem ? [(page as any).directItem] : cart}
+              total={(page as any).directItem ? (page as any).directItem.product.price * (page as any).directItem.qty : cartTotal}
+              user={user}
+              onPlaced={handleOrderPlaced}
+              onBack={back}
+            />
+          ) : (
+            <div className="min-h-screen flex items-center justify-center p-4 bg-white dark:bg-neutral-900">
+              <div className="text-center max-w-md bg-neutral-50 dark:bg-neutral-800 p-8 rounded-2xl border border-neutral-100 dark:border-neutral-700 shadow-xl">
+                <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100 mb-2 font-sans">Login Required</h2>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-6 font-sans">You need to log in to proceed to checkout. Please log in first.</p>
+                <button 
+                  onClick={() => navigate({ name: "login" })}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl transition duration-200 font-sans cursor-pointer"
+                >
+                  Go to Login
+                </button>
+              </div>
+            </div>
+          )
         )}
         {page.name === "login" && (
           <LoginPage onLogin={(u: { name: string; isAdmin: boolean }) => {
@@ -1171,9 +1245,41 @@ export default function App(): React.ReactElement {
             onProduct={(id: string) => navigate({ name: "product", id })}
             onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back} />
         )}
-        {page.name === "orders" && <OrdersPage user={user} onBack={back} />}
-        {page.name === "notifications" && user?.isAdmin && (
-          <NotificationsPage onBack={back} />
+        {page.name === "orders" && (
+          user ? (
+            <OrdersPage user={user} onBack={back} />
+          ) : (
+            <div className="min-h-screen flex items-center justify-center p-4 bg-white dark:bg-neutral-900">
+              <div className="text-center max-w-md bg-neutral-50 dark:bg-neutral-800 p-8 rounded-2xl border border-neutral-100 dark:border-neutral-700 shadow-xl">
+                <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100 mb-2 font-sans">Login Required</h2>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-6 font-sans">You need to log in to view your orders. Please log in first.</p>
+                <button 
+                  onClick={() => navigate({ name: "login" })}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl transition duration-200 font-sans cursor-pointer"
+                >
+                  Go to Login
+                </button>
+              </div>
+            </div>
+          )
+        )}
+        {page.name === "notifications" && (
+          user?.isAdmin ? (
+            <NotificationsPage onBack={back} />
+          ) : (
+            <div className="min-h-screen flex items-center justify-center p-4 bg-white dark:bg-neutral-900">
+              <div className="text-center max-w-md bg-neutral-50 dark:bg-neutral-800 p-8 rounded-2xl border border-neutral-100 dark:border-neutral-700 shadow-xl">
+                <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100 mb-2 font-sans">Access Denied</h2>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-6 font-sans">You need administrator privileges to view notifications.</p>
+                <button 
+                  onClick={() => navigate({ name: "login" })}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl transition duration-200 font-sans cursor-pointer"
+                >
+                  Go to Login
+                </button>
+              </div>
+            </div>
+          )
         )}
         {page.name === "allproducts" && (
           <AllProductsPage
@@ -1183,15 +1289,30 @@ export default function App(): React.ReactElement {
             onBuy={buyNow} onWish={toggleWishlist} wishlist={wishlist} onBack={back}
             onCategory={(id: string) => navigate({ name: "category", id })} />
         )}
-        {page.name === "admin" && user?.isAdmin && (
-          <AdminPanel
-            products={products} setProducts={setProducts}
-            categories={categories} setCategories={setCategories}
-            bannerImg={bannerImg} setBannerImg={setBannerImg}
-            notifyTabsToRefresh={notifyTabsToRefresh}
-            initialTab={(page as any).initialTab}
-            initialOrderId={(page as any).initialOrderId}
-            onBack={() => { refreshDataFromDB(); back(); }} />
+        {page.name === "admin" && (
+          user?.isAdmin ? (
+            <AdminPanel
+              products={products} setProducts={setProducts}
+              categories={categories} setCategories={setCategories}
+              bannerImg={bannerImg} setBannerImg={setBannerImg}
+              notifyTabsToRefresh={notifyTabsToRefresh}
+              initialTab={(page as any).initialTab}
+              initialOrderId={(page as any).initialOrderId}
+              onBack={() => { refreshDataFromDB(); back(); }} />
+          ) : (
+            <div className="min-h-screen flex items-center justify-center p-4 bg-white dark:bg-neutral-900">
+              <div className="text-center max-w-md bg-neutral-50 dark:bg-neutral-800 p-8 rounded-2xl border border-neutral-100 dark:border-neutral-700 shadow-xl">
+                <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100 mb-2 font-sans">Access Denied</h2>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-6 font-sans">You need administrator privileges to view this page. Please log in with an authorized admin account.</p>
+                <button 
+                  onClick={() => navigate({ name: "login" })}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl transition duration-200 font-sans cursor-pointer"
+                >
+                  Go to Login
+                </button>
+              </div>
+            </div>
+          )
         )}
         {page.name === "aboutus" && (
           <Suspense fallback={
@@ -1903,7 +2024,25 @@ function AllProductsPage({ products, categories, onProduct, onBuy, onWish, wishl
 /* ─────────────────── Product Page ───���─────────────── */
 function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: any) {
   const [imgIdx, setImgIdx] = useState(0);
-  const [size, setSize] = useState(product.sizes[0]);
+  const [size, setSize] = useState(product?.sizes?.[0] || "");
+
+  useEffect(() => {
+    if (product?.sizes?.[0] && !size) {
+      setSize(product.sizes[0]);
+    }
+  }, [product, size]);
+
+  if (!product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-lg font-medium text-neutral-600 dark:text-neutral-400 font-sans">Loading product details...</p>
+        </div>
+      </div>
+    );
+  }
+
   const wished = wishlist.includes(product.id);
   const fallbackProduct = CONFIG.FALLBACK_PRODUCT;
   const images = product.images && product.images.length > 0 ? product.images : [fallbackProduct];
