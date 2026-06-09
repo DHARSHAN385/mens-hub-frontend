@@ -173,17 +173,11 @@ GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
 GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
 
-# Cashfree Payment Gateway Configuration
-import base64
-def _get_fallback_key(encoded_str):
-    try:
-        return base64.b64decode(encoded_str).decode('utf-8')
-    except Exception:
-        return ""
-
-CASHFREE_APP_ID = config('CASHFREE_APP_ID', default=_get_fallback_key('MTI5Mjc0NTllMTNmNmQ1ODY3ZGRkMzFmZmRlNTQ3MjkyMQ=='))
-CASHFREE_SECRET_KEY = config('CASHFREE_SECRET_KEY', default=_get_fallback_key('Y2Zza19tYV9wcm9kXzk2NTIzNDJmODQyM2E3NTk2MmE2MmNmMWFiMWEyMjRhX2U0MDQxZmYw'))
-CASHFREE_MODE = config('CASHFREE_MODE', default='PROD')
+# Instamojo Payment Gateway Configuration
+INSTAMOJO_API_KEY = config('INSTAMOJO_API_KEY', default='d2c6e023bb43efbb2d16f2f405bf32b')
+INSTAMOJO_AUTH_TOKEN = config('INSTAMOJO_AUTH_TOKEN', default='1c76a2badc55092357b81f0885eae3a0')
+INSTAMOJO_SALT = config('INSTAMOJO_SALT', default='72cd8ff2f5ad408380498ff1d56fa054')
+INSTAMOJO_MODE = config('INSTAMOJO_MODE', default='PROD')
 FRONTEND_URL = config('FRONTEND_URL', default='https://menshub64.in')
 BACKEND_URL = config('BACKEND_URL', default='https://mens-hub-backend.onrender.com')
 

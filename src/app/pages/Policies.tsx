@@ -19,7 +19,7 @@ export default function Policies({ onBack }: { onBack: () => void }) {
           At Mens Hub, we respect your privacy and are committed to protecting your personal data. We collect information such as your name, delivery address, phone number, and email address solely to process your transactions and facilitate seamless delivery.
         </p>
         <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-          Your payment information is securely processed using standard SSL encryption via Cashfree Payments, and we never store your credit/debit card numbers or net banking credentials on our servers. Your information is never sold or shared with external third parties for marketing purposes.
+          Your payment information is securely processed using standard SSL encryption via Instamojo, and we never store your credit/debit card numbers or net banking credentials on our servers. Your information is never sold or shared with external third parties for marketing purposes.
         </p>
       </section>
 

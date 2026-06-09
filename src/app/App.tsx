@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
 import { CONFIG } from "./config";
 import { cartService } from "../services/cartService";
 import { wishlistService } from "../services/wishlistService";
-import { cashfreeService } from "../services/cashfreeService";
+import { instamojoService } from "../services/instamojoService";
 
 // Sync temporary localStorage cart/wishlist to permanent DB storage when user logs in
 async function migrateLocalToDB() {
@@ -2445,15 +2445,10 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
       const orderNumber = orderData.order_number || orderData.id;
       console.log('✅ Pending Order created on backend:', orderData);
 
-      // 3. Initiate payment session on Cashfree
-      toast.info("⏳ Creating secure Cashfree payment session...");
+      // 3. Initiate payment request on Instamojo
+      toast.info("⏳ Creating secure Instamojo payment request...");
 
-      cashfreeService.initialize({
-        appId: 'placeholder',
-        mode: 'TEST' // Configured as Sandbox mode by default
-      });
-
-      const initiationResult = await cashfreeService.initiatePayment({
+      const initiationResult = await instamojoService.initiatePayment({
         orderId: orderNumber,
         amount: total,
         customerName: form.name,
@@ -2461,42 +2456,18 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
         customerPhone: form.phone
       });
 
-      const sessionId = initiationResult.payment_session_id;
+      const paymentUrl = initiationResult.payment_url;
 
-      if (!sessionId) {
-        throw new Error("Did not receive payment_session_id from backend");
+      if (!paymentUrl) {
+        throw new Error("Did not receive payment redirect URL from backend");
       }
 
-      // Re-initialize Cashfree with the correct mode returned by backend (TEST or PROD)
-      if (initiationResult.mode) {
-        console.log(`🔄 Dynamically switching Cashfree to backend mode: ${initiationResult.mode}`);
-        cashfreeService.initialize({
-          appId: 'placeholder',
-          mode: initiationResult.mode
-        });
-      }
+      // 4. Redirect user to Instamojo payment page
+      toast.info("💳 Redirecting to secure Instamojo gateway...");
+      window.location.href = paymentUrl;
 
-      // 4. Trigger Cashfree SDK Checkout Popup Overlay
-      toast.info("💳 Launching Cashfree secure gateway...");
-      const modalResult = await cashfreeService.openPaymentModal(sessionId, orderNumber);
-
-      console.log("✅ Cashfree Checkout success callback completed:", modalResult);
-
-      // 5. Secure Backend Verification
-      toast.info("🔐 Securely verifying transaction status...");
-      const verificationResult = await cashfreeService.verifyPayment({
-        orderId: orderNumber,
-        paymentId: modalResult.txnId,
-        orderStatus: 'paid'
-      });
-
-      if (verificationResult.payment_status === 'success') {
-        toast.success(`🎉 Payment verified! Order #${orderNumber} placed!`);
-        setSuccess(true);
-        setTimeout(onPlaced, 1800);
-      } else {
-        toast.error("❌ Payment verification failed: " + verificationResult.message);
-      }
+      // Keep order placement flow pending while redirecting
+      return;
 
     } catch (error: any) {
       console.error('❌ Payment flow error:', error);
@@ -2637,7 +2608,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
                 Processing Payment...
               </>
             ) : (
-              'Pay with Cashfree Gateway'
+              'Pay with Instamojo'
             )}
           </button>
           <button onClick={() => setStep(0)} className="w-full py-2 text-sm text-neutral-500 underline text-center">← Back to Address</button>
@@ -2788,7 +2759,47 @@ function OrdersPage({ user, onBack }: any) {
   const [exchangeForm, setExchangeForm] = useState<any>({});
 
   useEffect(() => {
-    fetchUserOrders();
+    const checkPaymentVerification = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const paymentRequestId = params.get('payment_request_id');
+      const paymentId = params.get('payment_id');
+      const paymentStatus = params.get('payment_status');
+      const orderId = params.get('order_id');
+
+      if (paymentRequestId && orderId) {
+        toast.info("🔐 Securely verifying payment status...");
+        try {
+          const result = await instamojoService.verifyPayment({
+            orderId: orderId,
+            paymentRequestId: paymentRequestId,
+            paymentId: paymentId || undefined
+          });
+
+          if (result.payment_status === 'success') {
+            toast.success(`🎉 Payment verified! Order #${orderId} is being processed.`);
+          } else {
+            toast.error(`❌ Payment status: ${result.payment_status || 'failed'}`);
+          }
+        } catch (err: any) {
+          toast.error("❌ Payment verification failed: " + (err.message || err));
+        } finally {
+          // Clean parameters from URL so we don't trigger verification again on refresh
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('payment_id');
+          cleanUrl.searchParams.delete('payment_status');
+          cleanUrl.searchParams.delete('payment_request_id');
+          cleanUrl.searchParams.delete('order_id');
+          window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search);
+          
+          // Re-fetch orders to show updated status
+          fetchUserOrders();
+        }
+      } else {
+        fetchUserOrders();
+      }
+    };
+
+    checkPaymentVerification();
 
     // Auto-refresh orders every 5 seconds to show live admin updates
     const interval = setInterval(fetchUserOrders, 5000);

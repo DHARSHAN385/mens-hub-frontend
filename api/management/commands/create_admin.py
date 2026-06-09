@@ -7,9 +7,9 @@ class Command(BaseCommand):
     
     def handle(self, *args, **options):
         # Admin credentials
-        email = 'mubarak.ali@menshub.com'
+        email = 'mubarak@menshub.com'
         password = 'S@kMf$34'
-        name = 'Mubarak Ali'
+        name = 'Mubarak'
         
         # Check if user already exists
         if User.objects.filter(email=email).exists():
@@ -36,7 +36,7 @@ class Command(BaseCommand):
             )
             
             self.stdout.write(
-                self.style.SUCCESS(f'✓ Admin user created successfully')
+                self.style.SUCCESS(f'[SUCCESS] Admin user created successfully')
             )
             self.stdout.write(f'  Email: {email}')
             self.stdout.write(f'  Password: {password}')
@@ -44,5 +44,5 @@ class Command(BaseCommand):
             
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR(f'✗ Failed to create admin user: {str(e)}')
+                self.style.ERROR(f'[ERROR] Failed to create admin user: {str(e)}')
             )

@@ -35,7 +35,7 @@ echo.
 echo  Backend:  http://localhost:8000
 echo  Frontend: http://localhost:5173
 echo.
-echo  Admin Email: mubarak.ali@menshub.com
+echo  Admin Email: mubarak@menshub.com
 echo  Admin Password: S@kMf$34
 echo.
 echo  Close these command windows to stop the servers.

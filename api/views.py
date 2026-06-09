@@ -58,7 +58,7 @@ class IsAdminOrReadOnly(BasePermission):
             return bool(profile.is_admin)
         except UserProfile.DoesNotExist:
             # If no profile exists, check if user email matches admin emails
-            admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com', 'mubarakstr003@gmail.com']
+            admin_emails = ['menshubadmin01@gmail.com', 'mubarak@menshub.com', 'mubarakstr003@gmail.com']
             return request.user.email in admin_emails
 
 
@@ -228,7 +228,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
         except UserProfile.DoesNotExist:
-            admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com', 'mubarakstr003@gmail.com']
+            admin_emails = ['menshubadmin01@gmail.com', 'mubarak@menshub.com', 'mubarakstr003@gmail.com']
             if request.user.email not in admin_emails:
                 return Response(
                     {'error': 'Admin access required'},
@@ -275,18 +275,18 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def initiate_payment(self, request):
-        """Initiate Cashfree payment session."""
+        """Initiate Instamojo payment request."""
         try:
             import requests as py_requests
             
-            # Get Cashfree credentials from settings
-            cashfree_app_id = getattr(settings, 'CASHFREE_APP_ID', None)
-            cashfree_secret = getattr(settings, 'CASHFREE_SECRET_KEY', None)
-            cashfree_mode = getattr(settings, 'CASHFREE_MODE', 'TEST')
+            # Get Instamojo credentials from settings
+            api_key = getattr(settings, 'INSTAMOJO_API_KEY', None)
+            auth_token = getattr(settings, 'INSTAMOJO_AUTH_TOKEN', None)
+            mode = getattr(settings, 'INSTAMOJO_MODE', 'PROD')
             
-            if not cashfree_app_id or not cashfree_secret:
+            if not api_key or not auth_token:
                 return Response(
-                    {'error': 'Cashfree credentials not configured'},
+                    {'error': 'Instamojo credentials not configured'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
             
@@ -302,72 +302,78 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Create random customer_id if not authenticated or missing
-            cust_id = f"cust_{request.user.id}" if request.user and request.user.is_authenticated else f"cust_guest_{order_id}"
-            
-            # Use real Cashfree PG API endpoint
-            cashfree_url = "https://sandbox.cashfree.com/pg/orders" if cashfree_mode == 'TEST' else "https://api.cashfree.com/pg/orders"
+            # Fetch the order from the database to make sure it exists
+            try:
+                order = Order.objects.get(order_number=order_id)
+            except Order.DoesNotExist:
+                return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Determine API URL based on mode
+            instamojo_url = "https://test.instamojo.com/api/1.1/payment-requests/" if mode == 'TEST' else "https://www.instamojo.com/api/1.1/payment-requests/"
             
             headers = {
-                "x-client-id": cashfree_app_id,
-                "x-client-secret": cashfree_secret,
-                "x-api-version": "2023-08-01",
-                "Content-Type": "application/json"
+                "X-Api-Key": api_key,
+                "X-Auth-Token": auth_token,
+                "Content-Type": "application/x-www-form-urlencoded"
             }
             
-            # Check phone and email are not empty or invalid (Cashfree requirements)
-            valid_phone = customer_phone if customer_phone and len(customer_phone) >= 10 else "9999999999"
-            valid_email = customer_email if customer_email else "customer@menshub.com"
-            
-            session_data = {
-                'order_id': str(order_id),
-                'order_amount': amount,
-                'order_currency': 'INR',
-                'customer_details': {
-                    'customer_id': cust_id,
-                    'customer_name': customer_name,
-                    'customer_email': valid_email,
-                    'customer_phone': valid_phone
-                },
-                'order_meta': {
-                    'return_url': f"{settings.FRONTEND_URL}/orders?payment=success&order_id={order_id}"
-                }
+            # Form-encoded body parameters
+            payload = {
+                'amount': f"{amount:.2f}",
+                'purpose': f"Order {order_id} - Mens Hub",
+                'buyer_name': customer_name,
+                'email': customer_email if customer_email else "customer@menshub.com",
+                'phone': customer_phone if customer_phone else "9999999999",
+                'redirect_url': f"{settings.FRONTEND_URL}/?page=orders&order_id={order_id}",
+                'allow_repeated_payments': False
             }
             
-            # Make the API call to Cashfree to generate a real session
-            response = py_requests.post(cashfree_url, json=session_data, headers=headers, timeout=10)
+            # Make the API call to Instamojo
+            response = py_requests.post(instamojo_url, data=payload, headers=headers, timeout=15)
             
             if response.status_code not in [200, 201]:
-                print(f"❌ Cashfree response error ({response.status_code}): {response.text}")
+                print(f"❌ Instamojo response error ({response.status_code}): {response.text}")
                 return Response(
-                    {'error': f"Cashfree API Error: {response.text}"},
+                    {'error': f"Instamojo API Error: {response.text}"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
             res_json = response.json()
-            payment_session_id = res_json.get('payment_session_id')
-            cf_order_id = res_json.get('order_id')
-            
-            if not payment_session_id:
-                print(f"❌ Cashfree did not return payment_session_id: {res_json}")
+            if not res_json.get('success'):
+                print(f"❌ Instamojo success is False: {res_json}")
                 return Response(
-                    {'error': 'Cashfree payment session creation failed'},
+                    {'error': 'Instamojo payment request creation failed'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            payment_request = res_json.get('payment_request', {})
+            payment_request_id = payment_request.get('id')
+            longurl = payment_request.get('longurl')
+            
+            if not longurl:
+                print(f"❌ Instamojo did not return longurl: {res_json}")
+                return Response(
+                    {'error': 'Instamojo longurl redirect is missing'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            print(f"✅ Real Cashfree Payment Session Created: Order {cf_order_id} - ₹{amount}")
+            # Store payment_request_id temporarily as payment_id on the order
+            order.payment_id = payment_request_id
+            order.save()
+            
+            print(f"✅ Instamojo Payment Request Created: Order {order_id} - Request ID {payment_request_id} - ₹{amount}")
             
             return Response({
                 'status': 'success',
-                'payment_session_id': payment_session_id,
-                'order_id': cf_order_id,
+                'payment_url': longurl,
+                'payment_request_id': payment_request_id,
+                'order_id': order_id,
                 'amount': amount,
-                'mode': cashfree_mode,
-                'message': 'Payment session created. Launching Cashfree checkout...'
+                'message': 'Payment session created. Redirecting to Instamojo...'
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print(f"❌ Payment initiation error: {str(e)}")
+            print(f"❌ Instamojo payment initiation error: {str(e)}")
             return Response(
                 {'error': f'Payment initiation failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -375,105 +381,118 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def verify_payment(self, request):
-        """Verify Cashfree payment callback."""
+        """Verify Instamojo payment request status."""
         try:
             import requests as py_requests
             
             order_id = request.data.get('order_id')
-            payment_id = request.data.get('payment_id') # Might be empty on check init
+            payment_request_id = request.data.get('payment_request_id')
+            payment_id = request.data.get('payment_id')
             
             if not order_id:
                 return Response({'error': 'order_id required'}, status=status.HTTP_400_BAD_REQUEST)
-                
-            # Get Cashfree credentials from settings
-            cashfree_app_id = getattr(settings, 'CASHFREE_APP_ID', None)
-            cashfree_secret = getattr(settings, 'CASHFREE_SECRET_KEY', None)
-            cashfree_mode = getattr(settings, 'CASHFREE_MODE', 'TEST')
             
-            if not cashfree_app_id or not cashfree_secret:
+            # Fallback to fetching order to find payment_request_id if not supplied by frontend
+            try:
+                order = Order.objects.get(order_number=order_id)
+            except Order.DoesNotExist:
+                return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+                
+            req_id = payment_request_id or order.payment_id
+            if not req_id:
+                return Response({'error': 'payment_request_id not found for this order'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Get Instamojo credentials from settings
+            api_key = getattr(settings, 'INSTAMOJO_API_KEY', None)
+            auth_token = getattr(settings, 'INSTAMOJO_AUTH_TOKEN', None)
+            mode = getattr(settings, 'INSTAMOJO_MODE', 'PROD')
+            
+            if not api_key or not auth_token:
                 return Response(
-                    {'error': 'Cashfree credentials not configured'},
+                    {'error': 'Instamojo credentials not configured'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 
-            # Query Cashfree API directly for security check
-            base_url = "https://sandbox.cashfree.com/pg/orders" if cashfree_mode == 'TEST' else "https://api.cashfree.com/pg/orders"
-            verify_url = f"{base_url}/{order_id}"
+            # Query Instamojo API directly for security check
+            base_url = "https://test.instamojo.com/api/1.1/payment-requests" if mode == 'TEST' else "https://www.instamojo.com/api/1.1/payment-requests"
+            verify_url = f"{base_url}/{req_id}/"
             
             headers = {
-                "x-client-id": cashfree_app_id,
-                "x-client-secret": cashfree_secret,
-                "x-api-version": "2023-08-01"
+                "X-Api-Key": api_key,
+                "X-Auth-Token": auth_token
             }
             
-            response = py_requests.get(verify_url, headers=headers, timeout=10)
+            response = py_requests.get(verify_url, headers=headers, timeout=15)
             
             if response.status_code != 200:
-                print(f"❌ Cashfree verification API failed ({response.status_code}): {response.text}")
+                print(f"❌ Instamojo verification API failed ({response.status_code}): {response.text}")
                 return Response(
-                    {'error': f"Cashfree Verification Error: {response.text}"},
+                    {'error': f"Instamojo Verification Error: {response.text}"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
             res_json = response.json()
-            cashfree_status = res_json.get('order_status', '').upper()
-            
-            # Fetch payments details to find the transaction ID
-            payments_url = f"{base_url}/{order_id}/payments"
-            payments_response = py_requests.get(payments_url, headers=headers, timeout=10)
-            txn_id = payment_id
-            pay_method = 'upi'
-            if payments_response.status_code == 200:
-                payments_list = payments_response.json()
-                if isinstance(payments_list, list) and len(payments_list) > 0:
-                    latest_payment = payments_list[0]
-                    txn_id = latest_payment.get('cf_payment_id', payment_id)
-                    pay_method = latest_payment.get('payment_group', 'upi')
-            
-            # Update order with payment info
-            try:
-                order = Order.objects.get(order_number=order_id)
-                order.payment_id = txn_id
+            if not res_json.get('success'):
+                print(f"❌ Instamojo verification success is False: {res_json}")
+                return Response(
+                    {'error': 'Instamojo verification status query failed'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
                 
-                if cashfree_status == 'PAID':
-                    order.payment_status = 'success'
-                    order.payment_method = pay_method
-                    order.status = 'processing'
-                    order.save()
-                    
-                    # Create notification for admin now that order is paid
-                    try:
-                        create_order_notification(order)
-                        print(f"DEBUG: Notification triggered successfully for verified paid order {order_id}")
-                    except Exception as e:
-                        print(f"DEBUG: Notification error: {str(e)}")
-                elif cashfree_status in ['FAILED', 'CANCELLED']:
+            payment_request = res_json.get('payment_request', {})
+            status_value = payment_request.get('status', '').upper()
+            
+            payments_list = payment_request.get('payments', [])
+            has_credit_payment = False
+            actual_txn_id = payment_id
+            pay_method = 'upi'
+            
+            for pay in payments_list:
+                if pay.get('status', '').upper() == 'CREDIT':
+                    has_credit_payment = True
+                    actual_txn_id = pay.get('payment_id') or actual_txn_id
+                    pay_method = pay.get('instrument_type') or 'online'
+                    break
+            
+            is_successful = (status_value == 'COMPLETED') or has_credit_payment
+            
+            if is_successful:
+                order.payment_status = 'success'
+                order.payment_id = actual_txn_id or req_id
+                order.payment_method = pay_method
+                order.status = 'processing'
+                order.save()
+                
+                # Create notification for admin now that order is paid
+                try:
+                    create_order_notification(order)
+                    print(f"DEBUG: Notification triggered successfully for verified paid order {order_id}")
+                except Exception as e:
+                    print(f"DEBUG: Notification error: {str(e)}")
+            else:
+                if status_value == 'FAILED':
                     order.payment_status = 'failed'
                     order.status = 'cancelled'
-                    order.save()
                 else:
                     order.payment_status = 'pending'
                     order.status = 'pending'
-                    order.save()
+                order.save()
                 
-                print(f"✅ Real Payment verified: Order {order_id} - Cashfree Status: {cashfree_status} -> DB Status: {order.payment_status}")
-                
-                serializer = self.get_serializer(order)
-                return Response({
-                    'status': 'success',
-                    'cashfree_status': cashfree_status,
-                    'payment_status': order.payment_status,
-                    'message': f'Payment is {order.payment_status}',
-                    'order': serializer.data
-                }, status=status.HTTP_200_OK)
+            print(f"✅ Real Payment verified: Order {order_id} - Instamojo Status: {status_value} -> DB Status: {order.payment_status}")
             
-            except Order.DoesNotExist:
-                return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+            serializer = self.get_serializer(order)
+            return Response({
+                'status': 'success',
+                'instamojo_status': status_value,
+                'payment_status': order.payment_status,
+                'message': f'Payment is {order.payment_status}',
+                'order': serializer.data
+            }, status=status.HTTP_200_OK)
+            
         except Exception as e:
             print(f"❌ Payment verification error: {str(e)}")
             return Response(
-                {'error': f'Verification failed: {str(e)}'},
+                {'error': f'Payment verification failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
@@ -1094,7 +1113,7 @@ def google_oauth_login(request):
         # Create or update user profile for Google users
         from .models import UserProfile
         # Admin emails - add all authorized admin emails here
-        admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com', 'mubarakstr003@gmail.com']
+        admin_emails = ['menshubadmin01@gmail.com', 'mubarak@menshub.com', 'mubarakstr003@gmail.com']
         is_admin = email in admin_emails
         
         try:
@@ -1264,7 +1283,7 @@ def login_user(request):
     Returns: user data and auth token
     
     Admin credentials:
-    - Email: mubarak.ali@menshub.com or admin email
+    - Email: mubarak@menshub.com or admin email
     - Password: S@kMf$34
     """
     try:
@@ -1304,7 +1323,7 @@ def login_user(request):
         
         # Get or create user profile
         from .models import UserProfile
-        admin_emails = ['menshubadmin01@gmail.com', 'mubarak.ali@menshub.com', 'mubarakstr003@gmail.com']
+        admin_emails = ['menshubadmin01@gmail.com', 'mubarak@menshub.com', 'mubarakstr003@gmail.com']
         is_admin = user.is_staff or email in admin_emails
         
         profile, created = UserProfile.objects.get_or_create(user=user)
