@@ -4310,18 +4310,100 @@ function SizeCustomInput({ onAdd }: { onAdd: (s: string) => void }) {
 /* ─────────────────── Color Custom Input ─────────────────── */
 function ColorCustomInput({ onAdd }: { onAdd: (c: string) => void }) {
   const [val, setVal] = useState("");
-  const submit = () => { const v = val.trim(); if (v) { onAdd(v); setVal(""); } };
+  const [hex, setHex] = useState("#800000"); // default to Maroon
+
+  const getApproxColorName = (h: string): string => {
+    const cleanHex = h.toLowerCase().trim();
+    const presets: { [key: string]: string } = {
+      "#eab308": "Yellow",
+      "#22c55e": "Green",
+      "#ffffff": "White",
+      "#000000": "Black",
+      "#ca8a04": "Dark Yellow",
+      "#1e3a8a": "Navy Blue",
+      "#ef4444": "Red",
+      "#737373": "Grey",
+      "#3b82f6": "Blue",
+      "#ec4899": "Pink",
+      "#f97316": "Orange",
+      "#a855f7": "Purple",
+      "#78350f": "Brown",
+      "#800000": "Maroon",
+      "#e6e6fa": "Lavender",
+      "#fffdd0": "Cream",
+      "#f5f5dc": "Beige",
+      "#ffd700": "Gold",
+      "#008080": "Teal",
+      "#000080": "Navy",
+      "#e1ad01": "Mustard",
+      "#ffdab9": "Peach",
+      "#dda0dd": "Plum"
+    };
+    return presets[cleanHex] || h.toUpperCase();
+  };
+
+  const submit = () => {
+    const name = val.trim();
+    const colorHex = hex.trim();
+    if (name) {
+      // If user typed a name, save as "Name|Hex"
+      onAdd(`${name}|${colorHex}`);
+      setVal("");
+    } else {
+      // If no name, get approximate name or use Hex
+      const approxName = getApproxColorName(colorHex);
+      onAdd(`${approxName}|${colorHex}`);
+    }
+  };
+
   return (
-    <div className="flex gap-2 mt-1">
-      <input value={val} onChange={e => setVal(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
-        placeholder="Custom color (e.g. Lavender, Maroon)"
-        className="flex-1 px-2 py-1.5 text-xs border border-neutral-300 dark:border-neutral-700 rounded bg-transparent" />
-      <button type="button" onClick={submit}
-        className="px-3 py-1.5 text-xs rounded uppercase tracking-wider"
-        style={{ background: "var(--accent-grad)", color: "var(--accent-fg)", fontWeight: 600 }}>
-        + Add
-      </button>
+    <div className="flex flex-col gap-2 mt-2 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800">
+      <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">
+        Add Custom Color
+      </div>
+      <div className="flex items-center gap-2">
+        {/* Color Wheel Trigger */}
+        <div 
+          className="relative w-8 h-8 rounded-full shrink-0 border border-neutral-300 dark:border-neutral-700 shadow-sm transition hover:scale-110 active:scale-95 cursor-pointer"
+          style={{ 
+            background: "conic-gradient(from 0deg, red, yellow, lime, aqua, blue, magenta, red)" 
+          }}
+          title="Open Color Wheel"
+        >
+          <input 
+            type="color" 
+            value={hex} 
+            onChange={(e) => setHex(e.target.value)} 
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+          />
+        </div>
+
+        {/* Selected Color Preview Dot */}
+        <div 
+          className="w-5 h-5 rounded-full border border-neutral-300 dark:border-neutral-700 shadow-sm shrink-0"
+          style={{ backgroundColor: hex }}
+          title={`Selected: ${hex}`}
+        />
+
+        {/* Name Input */}
+        <input 
+          value={val} 
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
+          placeholder="Color name (e.g. Maroon, Lavender)"
+          className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-neutral-300 dark:border-neutral-700 rounded bg-transparent text-neutral-800 dark:text-neutral-200" 
+        />
+
+        {/* Add Button */}
+        <button 
+          type="button" 
+          onClick={submit}
+          className="px-3 py-1.5 text-xs rounded uppercase tracking-wider font-semibold hover:opacity-90 transition shrink-0"
+          style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}
+        >
+          + Add
+        </button>
+      </div>
     </div>
   );
 }
