@@ -707,7 +707,11 @@ export default function App(): React.ReactElement {
     localStorage.setItem('refreshData', Date.now().toString());
   };
   const getPageFromUrl = (searchString: string): Page => {
-    const params = new URLSearchParams(searchString);
+    let cleanedSearch = searchString || '';
+    if (cleanedSearch.startsWith('?')) {
+      cleanedSearch = '?' + cleanedSearch.slice(1).replace(/\?/g, '&');
+    }
+    const params = new URLSearchParams(cleanedSearch);
     const pageParam = params.get('page');
     if (!pageParam) return { name: "home" };
 
@@ -2760,7 +2764,11 @@ function OrdersPage({ user, onBack }: any) {
 
   useEffect(() => {
     const checkPaymentVerification = async () => {
-      const params = new URLSearchParams(window.location.search);
+      let cleanedSearch = window.location.search || '';
+      if (cleanedSearch.startsWith('?')) {
+        cleanedSearch = '?' + cleanedSearch.slice(1).replace(/\?/g, '&');
+      }
+      const params = new URLSearchParams(cleanedSearch);
       const paymentRequestId = params.get('payment_request_id');
       const paymentId = params.get('payment_id');
       const paymentStatus = params.get('payment_status');
