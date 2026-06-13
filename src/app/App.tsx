@@ -2450,7 +2450,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
       console.log('✅ Pending Order created on backend:', orderData);
 
       // 3. Initiate payment request on Instamojo
-      toast.info("⏳ Creating secure Instamojo payment request...");
+      toast.info("⏳ Creating secure payment request...");
 
       const initiationResult = await instamojoService.initiatePayment({
         orderId: orderNumber,
@@ -2467,7 +2467,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
       }
 
       // 4. Redirect user to Instamojo payment page
-      toast.info("💳 Redirecting to secure Instamojo gateway...");
+      toast.info("💳 Redirecting to secure payment gateway...");
       window.location.href = paymentUrl;
 
       // Keep order placement flow pending while redirecting
@@ -2612,7 +2612,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
                 Processing Payment...
               </>
             ) : (
-              'Pay with Instamojo'
+              'Continue with Pay'
             )}
           </button>
           <button onClick={() => setStep(0)} className="w-full py-2 text-sm text-neutral-500 underline text-center">← Back to Address</button>

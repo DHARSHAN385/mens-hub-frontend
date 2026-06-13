@@ -286,7 +286,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             
             if not api_key or not auth_token:
                 return Response(
-                    {'error': 'Instamojo credentials not configured'},
+                    {'error': 'Payment gateway credentials not configured'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
             
@@ -334,7 +334,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             if response.status_code not in [200, 201]:
                 print(f"❌ Instamojo response error ({response.status_code}): {response.text}")
                 return Response(
-                    {'error': f"Instamojo API Error: {response.text}"},
+                    {'error': f"Payment Gateway API Error: {response.text}"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
@@ -342,7 +342,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             if not res_json.get('success'):
                 print(f"❌ Instamojo success is False: {res_json}")
                 return Response(
-                    {'error': 'Instamojo payment request creation failed'},
+                    {'error': 'Payment request creation failed'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
@@ -353,7 +353,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             if not longurl:
                 print(f"❌ Instamojo did not return longurl: {res_json}")
                 return Response(
-                    {'error': 'Instamojo longurl redirect is missing'},
+                    {'error': 'Payment redirect URL is missing'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -369,7 +369,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'payment_request_id': payment_request_id,
                 'order_id': order_id,
                 'amount': amount,
-                'message': 'Payment session created. Redirecting to Instamojo...'
+                'message': 'Payment session created. Redirecting to secure payment gateway...'
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
