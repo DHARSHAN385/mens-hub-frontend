@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
 import { CONFIG } from "./config";
 import { cartService } from "../services/cartService";
 import { wishlistService } from "../services/wishlistService";
-import { instamojoService } from "../services/instamojoService";
+import { razorpayService } from "../services/razorpayService";
 
 // Sync temporary localStorage cart/wishlist to permanent DB storage when user logs in
 async function migrateLocalToDB() {
@@ -2449,10 +2449,10 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
       const orderNumber = orderData.order_number || orderData.id;
       console.log('✅ Pending Order created on backend:', orderData);
 
-      // 3. Initiate payment request on Instamojo
+      // 3. Initiate payment request on Razorpay
       toast.info("⏳ Creating secure payment request...");
 
-      const initiationResult = await instamojoService.initiatePayment({
+      const initiationResult = await razorpayService.initiatePayment({
         orderId: orderNumber,
         amount: total,
         customerName: form.name,
@@ -2460,25 +2460,77 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
         customerPhone: form.phone
       });
 
-      const paymentUrl = initiationResult.payment_url;
+      const { razorpay_order_id, amount, currency, key_id } = initiationResult;
 
-      if (!paymentUrl) {
-        throw new Error("Did not receive payment redirect URL from backend");
+      if (!razorpay_order_id) {
+        throw new Error("Did not receive Razorpay Order ID from backend");
       }
 
-      // 4. Redirect user to Instamojo payment page
-      toast.info("💳 Redirecting to secure payment gateway...");
-      window.location.href = paymentUrl;
+      // 4. Open Razorpay Standard Checkout modal
+      toast.info("💳 Opening secure payment gateway...");
+      
+      const options = {
+        key: key_id || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T1vKzzsyzpzJta',
+        amount: amount, // in paise
+        currency: currency || 'INR',
+        name: 'Mens Hub',
+        description: `Order #${orderNumber}`,
+        order_id: razorpay_order_id,
+        handler: async function (response: any) {
+          toast.info("🔐 Securely verifying payment status...");
+          try {
+            const verifyResult = await razorpayService.verifyPayment({
+              orderId: orderNumber,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpaySignature: response.razorpay_signature
+            });
+            
+            if (verifyResult.status === 'success' || verifyResult.payment_status === 'success') {
+              toast.success(`🎉 Payment verified! Order #${orderNumber} is being processed.`);
+              setSuccess(true);
+            } else {
+              toast.error(`❌ Payment status: ${verifyResult.payment_status || 'failed'}`);
+              setIsCreatingOrder(false);
+            }
+          } catch (err: any) {
+            console.error('Verification error:', err);
+            toast.error("❌ Payment verification failed: " + (err.message || err));
+            setIsCreatingOrder(false);
+          }
+        },
+        prefill: {
+          name: form.name,
+          email: (user && user.email) ? user.email : 'customer@menshub.com',
+          contact: form.phone
+        },
+        theme: {
+          color: '#d4af37'
+        },
+        modal: {
+          ondismiss: function() {
+            toast.warning("⚠️ Payment cancelled by user.");
+            setIsCreatingOrder(false);
+          }
+        }
+      };
 
-      // Keep order placement flow pending while redirecting
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        console.error('Razorpay payment failed:', resp.error);
+        toast.error(`❌ Payment failed: ${resp.error.description || 'Unknown error'}`);
+        setIsCreatingOrder(false);
+      });
+      
+      rzp.open();
       return;
 
     } catch (error: any) {
       console.error('❌ Payment flow error:', error);
       toast.error('Payment failed: ' + (error.message || error));
-    } finally {
       setIsCreatingOrder(false);
     }
+
   };
 
   if (success) return (

@@ -275,30 +275,33 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def initiate_payment(self, request):
-        """Initiate Instamojo payment request."""
+        """Initiate Razorpay payment request."""
         try:
-            import requests as py_requests
+            import razorpay
             
-            # Get Instamojo credentials from settings
-            api_key = getattr(settings, 'INSTAMOJO_API_KEY', None)
-            auth_token = getattr(settings, 'INSTAMOJO_AUTH_TOKEN', None)
-            mode = getattr(settings, 'INSTAMOJO_MODE', 'PROD')
+            # Get Razorpay credentials from settings
+            api_key = getattr(settings, 'RAZORPAY_KEY_ID', None)
+            api_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', None)
             
-            if not api_key or not auth_token:
+            if not api_key or not api_secret:
                 return Response(
-                    {'error': 'Payment gateway credentials not configured'},
+                    {'error': 'Razorpay gateway credentials not configured'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
             
             order_id = request.data.get('order_id')
             amount = float(request.data.get('amount', 0))
-            customer_name = request.data.get('customer_name', 'Customer')
-            customer_email = request.data.get('customer_email', '')
-            customer_phone = request.data.get('customer_phone', '')
             
             if not order_id or amount <= 0:
                 return Response(
                     {'error': 'Invalid order_id or amount'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            # Validate amount >= 100 paise (1.00 INR)
+            if amount < 1.0:
+                return Response(
+                    {'error': 'Amount must be at least 100 paise (1.00 INR)'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -308,72 +311,50 @@ class OrderViewSet(viewsets.ModelViewSet):
             except Order.DoesNotExist:
                 return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Determine API URL based on mode
-            instamojo_url = "https://test.instamojo.com/api/1.1/payment-requests/" if mode == 'TEST' else "https://www.instamojo.com/api/1.1/payment-requests/"
+            # Create Razorpay order
+            client = razorpay.Client(auth=(api_key, api_secret))
             
-            headers = {
-                "X-Api-Key": api_key,
-                "X-Auth-Token": auth_token,
-                "Content-Type": "application/x-www-form-urlencoded"
+            # Amount in paise (1 INR = 100 paise)
+            amount_paise = int(round(amount * 100))
+            
+            razorpay_order_data = {
+                'amount': amount_paise,
+                'currency': 'INR',
+                'receipt': str(order_id)
             }
             
-            # Form-encoded body parameters
-            payload = {
-                'amount': f"{amount:.2f}",
-                'purpose': f"Order {order_id} - Mens Hub",
-                'buyer_name': customer_name,
-                'email': customer_email if customer_email else "customer@menshub.com",
-                'phone': customer_phone if customer_phone else "9999999999",
-                'redirect_url': f"{settings.FRONTEND_URL}/?page=orders&order_id={order_id}",
-                'allow_repeated_payments': False
-            }
-            
-            # Make the API call to Instamojo
-            response = py_requests.post(instamojo_url, data=payload, headers=headers, timeout=15)
-            
-            if response.status_code not in [200, 201]:
-                print(f"❌ Instamojo response error ({response.status_code}): {response.text}")
+            try:
+                razorpay_order = client.order.create(data=razorpay_order_data)
+            except Exception as re:
+                print(f"❌ Razorpay API Error: {str(re)}")
                 return Response(
-                    {'error': f"Payment Gateway API Error: {response.text}"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {'error': f"Razorpay API Error: {str(re)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 
-            res_json = response.json()
-            if not res_json.get('success'):
-                print(f"❌ Instamojo success is False: {res_json}")
+            razorpay_order_id = razorpay_order.get('id')
+            if not razorpay_order_id:
                 return Response(
-                    {'error': 'Payment request creation failed'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-            payment_request = res_json.get('payment_request', {})
-            payment_request_id = payment_request.get('id')
-            longurl = payment_request.get('longurl')
-            
-            if not longurl:
-                print(f"❌ Instamojo did not return longurl: {res_json}")
-                return Response(
-                    {'error': 'Payment redirect URL is missing'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {'error': 'Razorpay failed to return order ID'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
             
-            # Store payment_request_id temporarily as payment_id on the order
-            order.payment_id = payment_request_id
+            # Store razorpay_order_id temporarily as payment_id on the order
+            order.payment_id = razorpay_order_id
             order.save()
             
-            print(f"✅ Instamojo Payment Request Created: Order {order_id} - Request ID {payment_request_id} - ₹{amount}")
+            print(f"✅ Razorpay Payment Order Created: Order {order_id} - Razorpay Order ID {razorpay_order_id} - ₹{amount}")
             
             return Response({
                 'status': 'success',
-                'payment_url': longurl,
-                'payment_request_id': payment_request_id,
-                'order_id': order_id,
-                'amount': amount,
-                'message': 'Payment session created. Redirecting to secure payment gateway...'
+                'razorpay_order_id': razorpay_order_id,
+                'amount': amount_paise,
+                'currency': 'INR',
+                'key_id': api_key
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print(f"❌ Instamojo payment initiation error: {str(e)}")
+            print(f"❌ Razorpay payment initiation error: {str(e)}")
             return Response(
                 {'error': f'Payment initiation failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -381,116 +362,84 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def verify_payment(self, request):
-        """Verify Instamojo payment request status."""
+        """Verify Razorpay payment signature."""
         try:
-            import requests as py_requests
+            import hmac
+            import hashlib
             
-            order_id = request.data.get('order_id')
-            payment_request_id = request.data.get('payment_request_id')
-            payment_id = request.data.get('payment_id')
+            razorpay_payment_id = request.data.get('razorpay_payment_id')
+            razorpay_order_id = request.data.get('razorpay_order_id')
+            razorpay_signature = request.data.get('razorpay_signature')
             
-            if not order_id:
-                return Response({'error': 'order_id required'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Fallback to fetching order to find payment_request_id if not supplied by frontend
-            try:
-                order = Order.objects.get(order_number=order_id)
-            except Order.DoesNotExist:
-                return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
-                
-            req_id = payment_request_id or order.payment_id
-            if not req_id:
-                return Response({'error': 'payment_request_id not found for this order'}, status=status.HTTP_400_BAD_REQUEST)
-                
-            # Get Instamojo credentials from settings
-            api_key = getattr(settings, 'INSTAMOJO_API_KEY', None)
-            auth_token = getattr(settings, 'INSTAMOJO_AUTH_TOKEN', None)
-            mode = getattr(settings, 'INSTAMOJO_MODE', 'PROD')
-            
-            if not api_key or not auth_token:
+            if not razorpay_payment_id or not razorpay_order_id or not razorpay_signature:
                 return Response(
-                    {'error': 'Instamojo credentials not configured'},
+                    {'error': 'Missing required Razorpay payment verification fields'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            # Get Razorpay credentials from settings
+            api_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', None)
+            if not api_secret:
+                return Response(
+                    {'error': 'Razorpay credentials not configured'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 
-            # Query Instamojo API directly for security check
-            base_url = "https://test.instamojo.com/api/1.1/payment-requests" if mode == 'TEST' else "https://www.instamojo.com/api/1.1/payment-requests"
-            verify_url = f"{base_url}/{req_id}/"
+            # Verify signature: HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET)
+            msg = f"{razorpay_order_id}|{razorpay_payment_id}"
+            generated_signature = hmac.new(
+                key=bytes(api_secret, 'utf-8'),
+                msg=bytes(msg, 'utf-8'),
+                digestmod=hashlib.sha256
+            ).hexdigest()
             
-            headers = {
-                "X-Api-Key": api_key,
-                "X-Auth-Token": auth_token
-            }
-            
-            response = py_requests.get(verify_url, headers=headers, timeout=15)
-            
-            if response.status_code != 200:
-                print(f"❌ Instamojo verification API failed ({response.status_code}): {response.text}")
+            if not hmac.compare_digest(generated_signature, razorpay_signature):
+                print(f"❌ Signature mismatch for Razorpay Order ID {razorpay_order_id}")
                 return Response(
-                    {'error': f"Instamojo Verification Error: {response.text}"},
+                    {'error': 'Payment verification failed: Signature mismatch'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
-            res_json = response.json()
-            if not res_json.get('success'):
-                print(f"❌ Instamojo verification success is False: {res_json}")
-                return Response(
-                    {'error': 'Instamojo verification status query failed'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-            payment_request = res_json.get('payment_request', {})
-            status_value = payment_request.get('status', '').upper()
-            
-            payments_list = payment_request.get('payments', [])
-            has_credit_payment = False
-            actual_txn_id = payment_id
-            pay_method = 'upi'
-            
-            for pay in payments_list:
-                if pay.get('status', '').upper() == 'CREDIT':
-                    has_credit_payment = True
-                    actual_txn_id = pay.get('payment_id') or actual_txn_id
-                    pay_method = pay.get('instrument_type') or 'online'
-                    break
-            
-            is_successful = (status_value == 'COMPLETED') or has_credit_payment
-            
-            if is_successful:
-                order.payment_status = 'success'
-                order.payment_id = actual_txn_id or req_id
-                order.payment_method = pay_method
-                order.status = 'processing'
-                order.save()
-                
-                # Create notification for admin now that order is paid
+            # Find the order
+            try:
+                order = Order.objects.get(payment_id=razorpay_order_id)
+            except Order.DoesNotExist:
+                # Fallback to checking order_id (receipt)
+                order_id = request.data.get('order_id')
                 try:
-                    create_order_notification(order)
-                    print(f"DEBUG: Notification triggered successfully for verified paid order {order_id}")
-                except Exception as e:
-                    print(f"DEBUG: Notification error: {str(e)}")
-            else:
-                if status_value == 'FAILED':
-                    order.payment_status = 'failed'
-                    order.status = 'cancelled'
-                else:
-                    order.payment_status = 'pending'
-                    order.status = 'pending'
-                order.save()
-                
-            print(f"✅ Real Payment verified: Order {order_id} - Instamojo Status: {status_value} -> DB Status: {order.payment_status}")
+                    order = Order.objects.get(order_number=order_id)
+                except Order.DoesNotExist:
+                    return Response(
+                        {'error': f'Order not found for Razorpay Order ID {razorpay_order_id}'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             
+            # Update order payment details
+            order.payment_status = 'success'
+            order.payment_id = razorpay_payment_id
+            order.payment_method = 'razorpay'
+            order.status = 'processing'
+            order.save()
+            
+            print(f"✅ Razorpay Payment verified successfully: Order {order.order_number} - Payment ID: {razorpay_payment_id}")
+            
+            # Create notification for admin now that order is paid
+            try:
+                create_order_notification(order)
+                print(f"DEBUG: Notification triggered successfully for verified paid order {order.order_number}")
+            except Exception as e:
+                print(f"DEBUG: Notification error: {str(e)}")
+                
             serializer = self.get_serializer(order)
             return Response({
                 'status': 'success',
-                'instamojo_status': status_value,
-                'payment_status': order.payment_status,
-                'message': f'Payment is {order.payment_status}',
+                'payment_status': 'success',
+                'message': 'Payment signature verified successfully',
                 'order': serializer.data
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print(f"❌ Payment verification error: {str(e)}")
+            print(f"❌ Razorpay payment verification error: {str(e)}")
             return Response(
                 {'error': f'Payment verification failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

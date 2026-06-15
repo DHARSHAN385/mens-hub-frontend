@@ -173,13 +173,18 @@ GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
 GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
 
-# Instamojo Payment Gateway Configuration
+# Instamojo Payment Gateway Configuration (Legacy)
 INSTAMOJO_API_KEY = config('INSTAMOJO_API_KEY', default='d2c6e023bb43efbb2d196f2f405bf32b')
 INSTAMOJO_AUTH_TOKEN = config('INSTAMOJO_AUTH_TOKEN', default='1c76a2badc55092357b81f0885eae3a0')
 INSTAMOJO_SALT = config('INSTAMOJO_SALT', default='72cd8ff2f5ad408380498ff1d56fa054')
 INSTAMOJO_MODE = config('INSTAMOJO_MODE', default='PROD')
 FRONTEND_URL = config('FRONTEND_URL', default='https://menshub64.in')
 BACKEND_URL = config('BACKEND_URL', default='https://mens-hub-backend.onrender.com')
+
+# Razorpay Payment Gateway Configuration
+RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
+RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
+
 
 
 # ============================================================================

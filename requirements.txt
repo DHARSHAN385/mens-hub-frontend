@@ -13,3 +13,5 @@ channels-redis==4.1.0
 daphne==4.0.0
 python-json-logger==2.0.7
 gunicorn==21.2.0
+razorpay==2.0.1
+

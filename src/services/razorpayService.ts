@@ -1,6 +1,6 @@
 /**
- * Instamojo Payment Service
- * Handles payment initiation and verification
+ * Razorpay Payment Service
+ * Handles payment initiation and verification api calls
  */
 
 import { apiCall } from "../api/client";
@@ -15,17 +15,18 @@ interface PaymentInitiation {
 
 interface PaymentVerification {
   orderId: string;
-  paymentRequestId: string;
-  paymentId?: string;
+  razorpayPaymentId: string;
+  razorpayOrderId: string;
+  razorpaySignature: string;
 }
 
-export class InstamojoService {
+export class RazorpayService {
   /**
-   * Initiate payment request with Instamojo backend
+   * Initiate payment order with backend
    */
   async initiatePayment(data: PaymentInitiation): Promise<any> {
     try {
-      console.log(`📦 Initiating Instamojo payment for order: ${data.orderId}`);
+      console.log(`📦 Initiating Razorpay payment order for: ${data.orderId}`);
 
       const result = await apiCall(
         "/api/orders/initiate_payment/",
@@ -39,38 +40,39 @@ export class InstamojoService {
         }
       );
 
-      console.log(`✅ Instamojo Payment initiated:`, result);
+      console.log(`✅ Razorpay Payment order created:`, result);
       return result;
     } catch (error) {
-      console.error(`❌ Instamojo Payment initiation error:`, error);
+      console.error(`❌ Razorpay Payment initiation error:`, error);
       throw error;
     }
   }
 
   /**
-   * Verify Instamojo payment status on backend
+   * Verify Razorpay signature on backend
    */
   async verifyPayment(data: PaymentVerification): Promise<any> {
     try {
-      console.log(`🔐 Verifying Instamojo payment: Request ID: ${data.paymentRequestId}, Payment ID: ${data.paymentId}`);
+      console.log(`🔐 Verifying Razorpay signature: Payment ID: ${data.razorpayPaymentId}, Order ID: ${data.razorpayOrderId}`);
 
       const result = await apiCall(
         "/api/orders/verify_payment/",
         "POST",
         {
           order_id: data.orderId,
-          payment_request_id: data.paymentRequestId,
-          payment_id: data.paymentId || "",
+          razorpay_payment_id: data.razorpayPaymentId,
+          razorpay_order_id: data.razorpayOrderId,
+          razorpay_signature: data.razorpaySignature,
         }
       );
 
-      console.log(`✅ Instamojo Payment verified:`, result);
+      console.log(`✅ Razorpay signature verified:`, result);
       return result;
     } catch (error) {
-      console.error(`❌ Instamojo Payment verification error:`, error);
+      console.error(`❌ Razorpay Payment verification error:`, error);
       throw error;
     }
   }
 }
 
-export const instamojoService = new InstamojoService();
+export const razorpayService = new RazorpayService();
