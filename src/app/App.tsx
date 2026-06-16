@@ -3953,6 +3953,28 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                       style={p.featured ? { background: "var(--accent-grad)", color: "var(--accent-fg)", fontWeight: 700, border: "1px solid var(--accent)", opacity: saving ? 0.5 : 1 } : { border: "1px solid var(--accent)", color: "var(--accent)", opacity: saving ? 0.5 : 1 }}>
                       ★
                     </button>
+                    {/* Quick In-Stock Toggle */}
+                    <button
+                      onClick={async () => {
+                        const updated = { ...p, in_stock: p.in_stock === false ? true : false };
+                        setSaving(true);
+                        try {
+                          await adminService.saveProduct(updated);
+                          setProducts((arr: Product[]) => arr.map(x => x.id === p.id ? updated : x));
+                          notifyTabsToRefresh();
+                          toast.success(updated.in_stock ? "Marked as In Stock ✓" : "Marked as Out of Stock ✓");
+                        } catch (err) {
+                          toast.error("Failed to update stock status");
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                      title={p.in_stock !== false ? "Mark as Out of Stock" : "Mark as In Stock"}
+                      className="px-3 py-2 rounded-md transition-all text-xs font-bold uppercase tracking-wider"
+                      style={p.in_stock !== false ? { background: "var(--accent-grad)", color: "var(--accent-fg)", border: "1px solid var(--accent)", opacity: saving ? 0.5 : 1 } : { border: "1px solid var(--accent)", color: "var(--accent)", opacity: saving ? 0.5 : 1 }}>
+                      {p.in_stock !== false ? "In Stock" : "Out of Stock"}
+                    </button>
                     <button onClick={() => setEditingProduct(p)} className="p-2 rounded-md" style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}><Edit2 size={14} /></button>
                     <button onClick={() => deleteProduct(p.id)} className="p-2 rounded-md border border-red-300 text-red-500"><Trash2 size={14} /></button>
                   </div>
