@@ -1251,7 +1251,7 @@ export default function App(): React.ReactElement {
         )}
         {page.name === "orders" && (
           user ? (
-            <OrdersPage user={user} onBack={back} />
+            <OrdersPage user={user} onBack={back} products={products} />
           ) : (
             <div className="min-h-screen flex items-center justify-center p-4 bg-white dark:bg-neutral-900">
               <div className="text-center max-w-md bg-neutral-50 dark:bg-neutral-800 p-8 rounded-2xl border border-neutral-100 dark:border-neutral-700 shadow-xl">
@@ -2405,6 +2405,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
         qty: item.qty,
         size: item.size,
         product_id: item.product.id,
+        image_url: item.product.image_url || (Array.isArray(item.product.images) && item.product.images[0]) || null,
         customColor: item.customColor || null,
         customDesign: item.customDesign || null,
       }));
@@ -2803,12 +2804,13 @@ function WishlistPage({ products, onProduct, onBuy, onWish, wishlist, onBack, on
 }
 
 /* ─────────────────── Orders Page ─────────────────── */
-function OrdersPage({ user, onBack }: any) {
+function OrdersPage({ user, onBack, products }: any) {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [exchangeRequesting, setExchangeRequesting] = useState(false);
   const [exchangeForm, setExchangeForm] = useState<any>({});
+  const [largeImagePreview, setLargeImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     const checkPaymentVerification = async () => {
@@ -2998,6 +3000,22 @@ function OrdersPage({ user, onBack }: any) {
     }
   };
 
+  const formatDateTime = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
   /* Detailed Order View */
   if (selectedOrder) {
     const isEligible = isExchangeEligible(selectedOrder);
@@ -3032,7 +3050,7 @@ function OrdersPage({ user, onBack }: any) {
             <div className="flex justify-between items-start mb-3">
               <div>
                 <h3 className="font-semibold text-lg">{selectedOrder.order_number || `Order #${selectedOrder.id}`}</h3>
-                <p className="text-sm text-neutral-500">Placed on {formatDate(selectedOrder.created_at)}</p>
+                <p className="text-sm text-neutral-500">Placed on {formatDateTime(selectedOrder.created_at)}</p>
               </div>
               <div className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${getStatusColor(selectedOrder.status)}`}>
                 {selectedOrder.status}
@@ -3096,9 +3114,17 @@ function OrdersPage({ user, onBack }: any) {
             </div>
 
             {/* Order Status Timeline */}
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2.5 text-sm">
               <div className="flex items-center gap-2">
                 <Package size={16} /> <span>₹{parseFloat(selectedOrder.total_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>💳</span>
+                <span className="text-neutral-600 dark:text-neutral-400">Payment:</span>
+                <span className="font-semibold uppercase">{selectedOrder.payment_method || 'UPI'}</span>
+                <span className={`ml-2 text-xs px-2 py-0.5 rounded font-semibold ${selectedOrder.payment_status === 'success' || selectedOrder.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                  {selectedOrder.payment_status === 'success' || selectedOrder.payment_status === 'paid' ? 'Paid' : 'Pending'}
+                </span>
               </div>
               {selectedOrder.tracking_number && (
                 <div
@@ -3138,28 +3164,50 @@ function OrdersPage({ user, onBack }: any) {
             <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl p-4">
               <h3 className="font-semibold mb-3">Order Items</h3>
               <div className="space-y-2">
-                {selectedOrder.items.map((item: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-center py-2 border-b border-neutral-100 dark:border-neutral-700 last:border-0">
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-neutral-500">Size: {item.size} | Qty: {item.qty}</p>
-                      {item.customColor && (
-                        <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
-                          <span>Color:</span>
-                          <span className="w-2.5 h-2.5 rounded-full inline-block border border-black/10 shrink-0" style={{ backgroundColor: getColorHex(item.customColor) }} />
-                          <span>{item.customColor}</span>
-                        </div>
-                      )}
-                      {item.customDesign && (
-                        <div className="text-xs text-neutral-500 flex items-center gap-1.5 mt-1">
-                          <span>Design:</span>
-                          <img src={optimizeImageUrl(item.customDesign, 60)} className="w-8 h-10 object-cover rounded border border-neutral-300 dark:border-neutral-700" />
-                        </div>
+                {selectedOrder.items.map((item: any, idx: number) => {
+                  const matchedProduct = products?.find((p: any) => p.id == item.product_id || p.id == item.id);
+                  const fallbackImg = CONFIG.FALLBACK_PRODUCT || CONFIG.FALLBACK_IMG;
+                  const imgUrl = item.image_url || matchedProduct?.image_url || matchedProduct?.images?.[0] || fallbackImg;
+
+                  return (
+                    <div key={idx} className="flex gap-4 items-center py-2.5 border-b border-neutral-100 dark:border-neutral-700 last:border-0">
+                      <img 
+                        src={optimizeImageUrl(imgUrl, 100)} 
+                        className="w-12 h-16 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800 shrink-0 cursor-zoom-in hover:scale-105 transition duration-200" 
+                        onError={(e: any) => e.target.src = fallbackImg} 
+                        onClick={() => setLargeImagePreview(imgUrl)}
+                        title="Click to zoom"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.name}</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">Size: {item.size} | Qty: {item.qty}</p>
+                        {item.customColor && (
+                          <div className="text-[10px] text-neutral-500 mt-1 flex items-center gap-1.5">
+                            <span>Color:</span>
+                            <span className="w-2.5 h-2.5 rounded-full inline-block border border-black/10 shrink-0" style={{ backgroundColor: getColorHex(item.customColor) }} />
+                            <span>{item.customColor}</span>
+                          </div>
+                        )}
+                        {item.customDesign && (
+                          <div className="text-[10px] text-neutral-500 flex items-center gap-1.5 mt-1">
+                            <span>Design:</span>
+                            <img 
+                              src={optimizeImageUrl(item.customDesign, 60)} 
+                              className="w-6 h-8 object-cover rounded border border-neutral-300 dark:border-neutral-700 cursor-zoom-in hover:scale-105 transition duration-200" 
+                              onClick={() => setLargeImagePreview(item.customDesign)}
+                              title="Click to zoom"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      {item.price && (
+                        <p className="font-semibold text-right shrink-0">
+                          ₹{(item.price * item.qty).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </p>
                       )}
                     </div>
-                    {item.price && <p className="font-semibold">₹{(item.price * item.qty).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -3334,6 +3382,29 @@ function OrdersPage({ user, onBack }: any) {
               </button>
             );
           })}
+        </div>
+      )}
+      {/* Large Image Preview Modal */}
+      {largeImagePreview && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setLargeImagePreview(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
+            <button 
+              className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white rounded-full p-2.5 transition"
+              onClick={() => setLargeImagePreview(null)}
+              aria-label="Close preview"
+            >
+              <X size={24} />
+            </button>
+            <img 
+              src={optimizeImageUrl(largeImagePreview, 1200)} 
+              className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl border border-white/10"
+              alt="Large preview"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -3560,6 +3631,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [viewingOrder, setViewingOrder] = useState<any | null>(null);
   const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [largeImagePreview, setLargeImagePreview] = useState<string | null>(null);
   const [trackingId, setTrackingId] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -4400,7 +4472,13 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                       return (
                         <tr key={idx} className="border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50">
                           <td className="p-3 flex items-center gap-3">
-                            <img src={optimizeImageUrl(imgUrl, 80)} className="w-10 h-10 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800 shrink-0" onError={(e: any) => e.target.src = fallbackImg} />
+                            <img 
+                              src={optimizeImageUrl(imgUrl, 80)} 
+                              className="w-10 h-10 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800 shrink-0 cursor-zoom-in hover:scale-105 transition duration-200" 
+                              onError={(e: any) => e.target.src = fallbackImg} 
+                              onClick={() => setLargeImagePreview(imgUrl)}
+                              title="Click to zoom"
+                            />
                             <div>
                               <div className="font-semibold">{item.name || item.product_name}</div>
                               {item.customColor && (
@@ -4413,7 +4491,12 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                               {item.customDesign && (
                                 <div className="text-[10px] text-neutral-500 flex items-center gap-1.5 mt-1">
                                   <span>Design:</span>
-                                  <img src={optimizeImageUrl(item.customDesign, 60)} className="w-6 h-8 object-cover rounded border border-neutral-300 dark:border-neutral-700" />
+                                  <img 
+                                    src={optimizeImageUrl(item.customDesign, 60)} 
+                                    className="w-6 h-8 object-cover rounded border border-neutral-300 dark:border-neutral-700 cursor-zoom-in hover:scale-105 transition duration-200" 
+                                    onClick={() => setLargeImagePreview(item.customDesign)}
+                                    title="Click to zoom"
+                                  />
                                 </div>
                               )}
                             </div>
@@ -4509,6 +4592,29 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Large Image Preview Modal */}
+      {largeImagePreview && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setLargeImagePreview(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
+            <button 
+              className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white rounded-full p-2.5 transition"
+              onClick={() => setLargeImagePreview(null)}
+              aria-label="Close preview"
+            >
+              <X size={24} />
+            </button>
+            <img 
+              src={optimizeImageUrl(largeImagePreview, 1200)} 
+              className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl border border-white/10"
+              alt="Large preview"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}
