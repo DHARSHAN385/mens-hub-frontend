@@ -161,6 +161,7 @@ export interface AdminProduct {
   sizes?: string[];
   popularity?: number;
   featured?: boolean;
+  in_stock?: boolean;
 }
 
 export interface AdminCategory {
@@ -205,6 +206,7 @@ export const saveProduct = async (product: any): Promise<any> => {
       sizes: product.sizes || [],
       popularity: product.popularity || 0,
       featured: product.featured || false,
+      in_stock: product.in_stock !== false,
       images: Array.isArray(product.images) ? product.images.filter((img: string) => img && !img.startsWith('data:image/')) : [],
       custom_designs: Array.isArray(product.custom_designs) ? product.custom_designs.filter((img: string) => img && !img.startsWith('data:image/')) : [],
       color_patterns: Array.isArray(product.color_patterns) ? product.color_patterns : []
