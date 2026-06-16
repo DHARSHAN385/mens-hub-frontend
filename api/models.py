@@ -85,6 +85,7 @@ class Product(models.Model):
     color_patterns = models.JSONField(default=list, blank=True, help_text="List of available color patterns for Stone Shirts")
     popularity = models.IntegerField(default=0, db_index=True)
     featured = models.BooleanField(default=False, db_index=True)
+    in_stock = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

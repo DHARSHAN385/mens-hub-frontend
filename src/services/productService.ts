@@ -15,6 +15,7 @@ export interface Product {
   sizes?: string[];
   popularity?: number;
   featured?: boolean;
+  in_stock?: boolean;
   image_url?: string;
   category_image?: string;
   banner_image?: string;

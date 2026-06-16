@@ -47,7 +47,7 @@ import {
 
 /* ─────────────────── Types ─────────────────── */
 type Category = { id: number | string; name: string; img: string };
-type Product = { id: string; name: string; price: number; category: string | number; image_url?: string; category_image?: string; banner_image?: string; images?: string[]; popularity: number; sizes: string[]; featured?: boolean; custom_designs?: string[]; color_patterns?: string[] };
+type Product = { id: string; name: string; price: number; category: string | number; image_url?: string; category_image?: string; banner_image?: string; images?: string[]; popularity: number; sizes: string[]; featured?: boolean; in_stock?: boolean; custom_designs?: string[]; color_patterns?: string[] };
 type CartItem = { product: Product; size: string; qty: number; customColor?: string; customDesign?: string };
 type OrderNotification = {
   id: string;
@@ -1825,8 +1825,9 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist, onAddToCart 
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900 cursor-pointer" onClick={() => onProduct(product.id)}>
         <img src={productImage} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy" decoding="async" alt={product.name} onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackProduct, 300); }} />
         {/* Add to Cart button */}
-        <button onClick={e => { e.stopPropagation(); onAddToCart(product, selectedSize); }}
-          className="absolute top-2 w-9 h-9 rounded-full flex items-center justify-center shadow-sm transition hover:scale-110 active:scale-95"
+        <button onClick={e => { e.stopPropagation(); if (product.in_stock !== false) onAddToCart(product, selectedSize); else toast.error("Product is out of stock!"); }}
+          disabled={product.in_stock === false}
+          className="absolute top-2 w-9 h-9 rounded-full flex items-center justify-center shadow-sm transition hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ right: "3rem", background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}
           aria-label="Add to cart">
           <ShoppingCart size={16} style={{ color: "var(--accent)" }} />
@@ -1864,10 +1865,11 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist, onAddToCart 
       </div>
       {/* Buy Now */}
       <div className="mt-2 px-1 pb-1">
-        <button onClick={() => onBuy(product, selectedSize)}
-          className="w-full text-xs uppercase tracking-wider py-1.5 rounded-md transition"
-          style={{ background: "var(--accent-grad)", color: "var(--accent-fg)", fontWeight: 600 }}>
-          {isOneSize ? "Buy Now" : `Buy Now — ${selectedSize}`}
+        <button onClick={() => { if (product.in_stock !== false) onBuy(product, selectedSize); else toast.error("Product is out of stock!"); }}
+          disabled={product.in_stock === false}
+          className="w-full text-xs uppercase tracking-wider py-1.5 rounded-md transition disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{ background: product.in_stock === false ? "#9ca3af" : "var(--accent-grad)", color: product.in_stock === false ? "white" : "var(--accent-fg)", fontWeight: 600 }}>
+          {product.in_stock === false ? "Out of Stock" : isOneSize ? "Buy Now" : `Buy Now — ${selectedSize}`}
         </button>
       </div>
     </div>
@@ -2251,10 +2253,10 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
             </div>
           </div>
           <div className="flex gap-3 mt-8">
-            <button onClick={handleAddToCart} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90"
-              style={{ border: "1px solid var(--accent)", color: "var(--accent)", background: "transparent" }}>Add to Cart</button>
-            <button onClick={handleBuyNow} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90"
-              style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>Buy Now</button>
+            <button onClick={handleAddToCart} disabled={product.in_stock === false} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ border: "1px solid var(--accent)", color: "var(--accent)", background: "transparent" }}>{product.in_stock === false ? "Out of Stock" : "Add to Cart"}</button>
+            <button onClick={handleBuyNow} disabled={product.in_stock === false} className="flex-1 py-3 uppercase tracking-wider text-[11px] md:text-sm rounded-md font-semibold transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: product.in_stock === false ? "#9ca3af" : "var(--accent-grad)", color: product.in_stock === false ? "white" : "var(--accent-fg)" }}>{product.in_stock === false ? "Out of Stock" : "Buy Now"}</button>
             <button onClick={() => onWish(product.id)} className="px-4 border border-neutral-300 dark:border-neutral-700 flex items-center justify-center rounded-md transition hover:scale-105" aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}>
               <Heart size={20} className={wished ? "fill-red-500 text-red-500" : ""} />
             </button>
@@ -3882,7 +3884,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
           <div className="flex gap-2 mb-4">
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search products…"
               className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded bg-transparent" />
-            <button onClick={() => setEditingProduct({ id: "", name: "", price: 0, category: categories[0]?.id || "", popularity: 5, sizes: ["M"], images: [""], featured: false })}
+            <button onClick={() => setEditingProduct({ id: "", name: "", price: 0, category: categories[0]?.id || "", popularity: 5, sizes: ["M"], images: [""], featured: false, in_stock: true })}
               className="px-4 py-2 text-sm uppercase tracking-wider"
               style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>+ Add</button>
           </div>
@@ -4746,6 +4748,22 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
               <span className="text-xs px-2 py-0.5 rounded-full"
                 style={{ background: p.featured ? "rgba(255,255,255,0.25)" : "var(--accent-grad)", color: p.featured ? "inherit" : "var(--accent-fg)", fontWeight: 700 }}>
                 {p.featured ? "ON" : "OFF"}
+              </span>
+            </button>
+            {/* In Stock Toggle */}
+            <button
+              type="button"
+              onClick={() => setP((prev: Product) => ({ ...prev, in_stock: prev.in_stock === false ? true : false }))}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all"
+              style={p.in_stock !== false
+                ? { background: "var(--accent-grad)", color: "var(--accent-fg)", border: "1px solid var(--accent)" }
+                : { border: "1px solid var(--accent)", color: "var(--accent)" }}>
+              <span className="flex items-center gap-2 text-sm uppercase tracking-wider" style={{ fontWeight: 600 }}>
+                <span>📦</span> In Stock
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: p.in_stock !== false ? "rgba(255,255,255,0.25)" : "var(--accent-grad)", color: p.in_stock !== false ? "inherit" : "var(--accent-fg)", fontWeight: 700 }}>
+                {p.in_stock !== false ? "ON" : "OFF"}
               </span>
             </button>
             {/* Sizes editor */}

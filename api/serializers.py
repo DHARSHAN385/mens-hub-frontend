@@ -95,7 +95,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ['id', 'name', 'description', 'price', 'category', 'category_name', 'image_url', 'images', 'stock', 'sizes', 'popularity', 'featured', 'custom_designs', 'color_patterns', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'price', 'category', 'category_name', 'image_url', 'images', 'stock', 'sizes', 'popularity', 'featured', 'in_stock', 'custom_designs', 'color_patterns', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
     def _ensure_media_path(self, value):
