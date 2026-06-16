@@ -1823,7 +1823,14 @@ function ProductCard({ product, onProduct, onBuy, onWish, wishlist, onAddToCart 
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
       {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900 cursor-pointer" onClick={() => onProduct(product.id)}>
-        <img src={productImage} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy" decoding="async" alt={product.name} onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackProduct, 300); }} />
+        <img src={productImage} className={`w-full h-full object-cover transition duration-500 ${product.in_stock === false ? 'opacity-60 grayscale' : 'group-hover:scale-105'}`} loading="lazy" decoding="async" alt={product.name} onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackProduct, 300); }} />
+        {product.in_stock === false && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-neutral-900/10">
+            <span className="bg-red-500 text-white text-[10px] md:text-xs font-bold px-3 py-1 rounded shadow-md tracking-wider">
+              OUT OF STOCK
+            </span>
+          </div>
+        )}
         {/* Add to Cart button */}
         <button onClick={e => { e.stopPropagation(); if (product.in_stock !== false) onAddToCart(product, selectedSize); else toast.error("Product is out of stock!"); }}
           disabled={product.in_stock === false}
@@ -2119,7 +2126,14 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
       <div className="grid md:grid-cols-2 gap-8">
         <div>
           <div className="relative aspect-[3/4] bg-neutral-100 dark:bg-neutral-900 rounded-xl overflow-hidden group">
-            <img src={optimizeImageUrl(displayImages[imgIdx], 600)} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" onError={(e: any) => { e.target.src = fallbackProduct; }} />
+            <img src={optimizeImageUrl(displayImages[imgIdx], 600)} className={`w-full h-full object-cover transition duration-500 ${product.in_stock === false ? 'opacity-60 grayscale' : 'group-hover:scale-110'}`} onError={(e: any) => { e.target.src = fallbackProduct; }} />
+            {product.in_stock === false && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-neutral-900/10">
+                <span className="bg-red-500 text-white text-sm md:text-base font-bold px-4 py-1.5 rounded shadow-lg tracking-wider">
+                  OUT OF STOCK
+                </span>
+              </div>
+            )}
             {displayImages.length > 1 && (
               <>
                 <button onClick={() => setImgIdx((imgIdx - 1 + displayImages.length) % displayImages.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 dark:bg-neutral-900/90 flex items-center justify-center" aria-label="Previous image"><ChevronLeft size={18} /></button>
