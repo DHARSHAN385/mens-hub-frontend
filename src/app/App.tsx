@@ -1066,8 +1066,8 @@ export default function App(): React.ReactElement {
         );
         if (existingIdx >= 0) {
           const newQty = prevCart[existingIdx].qty + 1;
-          if (newQty > 5) {
-            toast.error("Stock limit reached (Max 5 per item)");
+          if (newQty > 100) {
+            toast.error("Stock limit reached (Max 100 per item)");
             return prevCart;
           }
           const copy = [...prevCart];
@@ -2276,7 +2276,7 @@ function CartPage({ cart, setCart, onCheckout, onBack, total }: any) {
   const update = (i: number, qty: number) => {
     setCart((c: CartItem[]) => {
       if (qty <= 0) return c.filter((_, x) => x !== i);
-      if (qty > 5) { toast.error("Stock limit reached"); return c; }
+      if (qty > 100) { toast.error("Stock limit reached (Max 100 per item)"); return c; }
       const copy = [...c]; copy[i] = { ...copy[i], qty }; return copy;
     });
   };
