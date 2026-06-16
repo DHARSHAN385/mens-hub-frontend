@@ -2093,31 +2093,11 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
   };
 
   const handleAddToCart = () => {
-    if (isStoneShirt) {
-      if (!customColor) {
-        toast.error("Please select a Color pattern for your custom shirt");
-        return;
-      }
-      if (!customDesign) {
-        toast.error("Please select a Design style for your custom shirt");
-        return;
-      }
-    }
-    onAddToCart(product, size, customColor, customDesign);
+    onAddToCart(product, size, customColor || undefined, customDesign || undefined);
   };
 
   const handleBuyNow = () => {
-    if (isStoneShirt) {
-      if (!customColor) {
-        toast.error("Please select a Color pattern for your custom shirt");
-        return;
-      }
-      if (!customDesign) {
-        toast.error("Please select a Design style for your custom shirt");
-        return;
-      }
-    }
-    onBuy(product, size, customColor, customDesign);
+    onBuy(product, size, customColor || undefined, customDesign || undefined);
   };
 
   return (
@@ -2161,7 +2141,7 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
           {/* Color Pattern Customization Selector (Stone Shirts Only) */}
           {isStoneShirt && (
             <div className="mt-6">
-              <div className="text-sm uppercase tracking-wider mb-2">Select Color</div>
+              <div className="text-sm uppercase tracking-wider mb-2">Select Color (Optional)</div>
               <div className="flex flex-wrap gap-2">
                 {colorsList.map((c: string) => {
                   const [colorName, colorHex] = c.split('|');
@@ -2200,7 +2180,7 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
           {/* Design Templates Customization Selector (Stone Shirts Only) */}
           {isStoneShirt && (
             <div className="mt-6">
-              <div className="text-sm uppercase tracking-wider mb-2">Select Design</div>
+              <div className="text-sm uppercase tracking-wider mb-2">Select Design (Optional)</div>
               {designsList.length === 0 ? (
                 <div className="text-xs text-neutral-500 py-3 px-4 rounded-lg bg-neutral-100 dark:bg-neutral-900">
                   Contact us on WhatsApp for available designs!
