@@ -4745,37 +4745,55 @@ function ColorCustomInput({ onAdd }: { onAdd: (c: string) => void }) {
 /* ─────────────────── Product Editor ─────────────────── */
 function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefresh }: any) {
   const [p, setP] = useState<Product>({ ...product });
-  const [preview, setPreview] = useState(product.image_url || product.images?.[0] || "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingDesign, setUploadingDesign] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const designFileRef = useRef<HTMLInputElement>(null);
+  const activeUploadIndexRef = useRef<number | null>(null);
 
   const isStoneShirt = String(p.category) === "11" || p.category === 11;
 
   const PRESET_COLORS = ["Yellow", "Green", "White", "Black", "Dark Yellow", "Navy Blue", "Red", "Grey", "Blue", "Pink", "Orange", "Purple", "Brown"];
 
+  const productImages = useMemo(() => {
+    const arr = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+    if (arr.length === 0 && p.image_url) {
+      return [p.image_url];
+    }
+    return arr;
+  }, [p.images, p.image_url]);
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Show preview immediately
-    const url = await fileToDataURL(file);
-    setPreview(url);
-
-    // Upload file in background
     setUploading(true);
     try {
       const uploadedUrl = await adminService.uploadImage(file);
-      setP((prev: Product) => ({ ...prev, image_url: uploadedUrl, images: [uploadedUrl] }));
+      setP((prev: Product) => {
+        const currentImages = Array.isArray(prev.images) ? [...prev.images].filter(Boolean) : (prev.image_url ? [prev.image_url] : []);
+        const targetIndex = activeUploadIndexRef.current !== null ? activeUploadIndexRef.current : currentImages.length;
+        
+        if (targetIndex < 4) {
+          currentImages[targetIndex] = uploadedUrl;
+        }
+        
+        const finalImages = currentImages.filter(Boolean);
+        return {
+          ...prev,
+          image_url: finalImages[0] || "",
+          images: finalImages
+        };
+      });
       toast.success("✅ Image uploaded successfully");
     } catch (error: any) {
       console.error("❌ Image upload failed:", error);
       toast.error(error.message || "Failed to upload image");
-      // Keep preview but don't set to product images
     } finally {
       setUploading(false);
+      activeUploadIndexRef.current = null;
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -4817,10 +4835,9 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
 
   const handleSave = () => {
     setSaving(true);
-    const img = p.images?.[0] || p.image_url || preview || "";
-    // Avoid saving base64 representations to database
-    const finalImg = img.startsWith('data:image/') ? '' : img;
-    onSave({ ...p, image_url: finalImg, images: [finalImg] });
+    const finalImages = productImages.filter((img: string) => img && !img.startsWith('data:image/'));
+    const finalImageUrl = finalImages[0] || "";
+    onSave({ ...p, image_url: finalImageUrl, images: finalImages });
     // Reset saving state after save completes
     setTimeout(() => setSaving(false), 500);
   };
@@ -4839,16 +4856,70 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
         {/* Content */}
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="space-y-3">
-            <div className="relative rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900 h-40 flex items-center justify-center cursor-pointer"
-              onClick={() => !uploading && fileRef.current?.click()} style={{ border: "2px dashed var(--accent)", opacity: uploading ? 0.6 : 1, cursor: uploading ? 'wait' : 'pointer' }}>
-              {preview ? (
-                <img src={preview} className="w-full h-full object-cover" onError={() => setPreview("")} />
-              ) : (
-                <div className="text-center"><ImageIcon size={32} className="mx-auto mb-2" style={{ color: "var(--accent)" }} /><div className="text-sm" style={{ color: "var(--accent)" }}>Click to upload</div></div>
-              )}
-              <button type="button" onClick={e => { e.stopPropagation(); !uploading && fileRef.current?.click(); }}
-                className="absolute bottom-2 right-2 px-2 py-1 text-xs rounded flex items-center gap-1"
-                style={{ background: "var(--accent-grad)", color: "var(--accent-fg)", opacity: uploading ? 0.5 : 1 }} disabled={uploading}><Upload size={10} /> {uploading ? "Uploading..." : "Device"}</button>
+            {/* Multiple Product Images (Up to 4) */}
+            <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--accent)", background: "rgba(212,175,55,0.02)" }}>
+              <div className="flex justify-between items-center">
+                <span className="text-xs uppercase tracking-wider font-semibold" style={{ color: "var(--accent)" }}>
+                  Product Images (Up to 4)
+                </span>
+                {uploading && <span className="text-[10px] animate-pulse text-amber-500 font-semibold">Uploading...</span>}
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {[0, 1, 2, 3].map((index) => {
+                  const imgUrl = productImages[index];
+                  return (
+                    <div 
+                      key={index} 
+                      className="relative aspect-[3/4] rounded-lg overflow-hidden border bg-neutral-100 dark:bg-neutral-900 flex flex-col items-center justify-center transition"
+                      style={{ 
+                        border: imgUrl ? "1px solid border-neutral-200 dark:border-neutral-800" : "1.5px dashed var(--accent)",
+                        opacity: uploading && activeUploadIndexRef.current === index ? 0.6 : 1
+                      }}
+                    >
+                      {imgUrl ? (
+                        <>
+                          <img src={optimizeImageUrl(imgUrl, 120)} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = productImages.filter((_, idx) => idx !== index);
+                              setP((prev: Product) => ({
+                                ...prev,
+                                image_url: updated[0] || "",
+                                images: updated
+                              }));
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition flex items-center justify-center shadow-md"
+                            title="Remove image"
+                            style={{ width: "16px", height: "16px" }}
+                          >
+                            <X size={10} />
+                          </button>
+                          {index === 0 && (
+                            <span className="absolute bottom-1 left-1 bg-amber-500 text-neutral-950 px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">
+                              Main
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (uploading) return;
+                            activeUploadIndexRef.current = index;
+                            fileRef.current?.click();
+                          }}
+                          className="flex flex-col items-center justify-center w-full h-full cursor-pointer hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition p-1"
+                          disabled={uploading}
+                        >
+                          <Plus size={14} style={{ color: "var(--accent)" }} />
+                          <span className="text-[9px] mt-1 text-center font-semibold uppercase tracking-wider text-neutral-400">Add</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
             <input value={p.name} onChange={e => setP({ ...p, name: e.target.value })} placeholder="Product Name" className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-700 rounded bg-transparent" />
