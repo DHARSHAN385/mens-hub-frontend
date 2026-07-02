@@ -118,9 +118,8 @@ export const compressImage = async (file: File, maxWidth = 1200, quality = 0.8):
  */
 export const uploadImage = async (file: File): Promise<string> => {
   try {
-    // Compress image client-side first to dramatically improve page load performance
-    console.log('⏳ Optimizing and compressing image before upload...');
-    const optimizedFile = await compressImage(file, 1200, 0.8);
+    // Compress image client-side first — 800px max for fast upload
+    const optimizedFile = await compressImage(file, 800, 0.75);
     
     const formData = new FormData();
     formData.append('image', optimizedFile);

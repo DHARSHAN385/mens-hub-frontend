@@ -4815,26 +4815,47 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 1. Show INSTANT local preview (< 1ms) so admin sees image right away
+    const localPreviewUrl = URL.createObjectURL(file);
+    const targetIndex = activeUploadIndexRef.current !== null
+      ? activeUploadIndexRef.current
+      : (Array.isArray(p.images) ? p.images.filter(Boolean).length : p.image_url ? 1 : 0);
+    
+    setP((prev: Product) => {
+      const currentImages = Array.isArray(prev.images) ? [...prev.images].filter(Boolean) : (prev.image_url ? [prev.image_url] : []);
+      if (targetIndex < 4) {
+        currentImages[targetIndex] = localPreviewUrl;
+      }
+      const finalImages = currentImages.filter(Boolean);
+      return { ...prev, image_url: finalImages[0] || "", images: finalImages };
+    });
+
     setUploading(true);
     try {
+      // 2. Upload in background (compressed at 800px/0.75q for speed)
       const uploadedUrl = await adminService.uploadImage(file);
+      
+      // 3. Replace local preview with the real hosted URL
       setP((prev: Product) => {
-        const currentImages = Array.isArray(prev.images) ? [...prev.images].filter(Boolean) : (prev.image_url ? [prev.image_url] : []);
-        const targetIndex = activeUploadIndexRef.current !== null ? activeUploadIndexRef.current : currentImages.length;
-        
-        if (targetIndex < 4) {
+        const currentImages = Array.isArray(prev.images) ? [...prev.images] : (prev.image_url ? [prev.image_url] : []);
+        const previewIdx = currentImages.indexOf(localPreviewUrl);
+        if (previewIdx >= 0) {
+          currentImages[previewIdx] = uploadedUrl;
+        } else if (targetIndex < 4) {
           currentImages[targetIndex] = uploadedUrl;
         }
-        
-        const finalImages = currentImages.filter(Boolean);
-        return {
-          ...prev,
-          image_url: finalImages[0] || "",
-          images: finalImages
-        };
+        URL.revokeObjectURL(localPreviewUrl); // free memory
+        const finalImages = currentImages.filter((u: string) => u && !u.startsWith('blob:'));
+        return { ...prev, image_url: finalImages[0] || "", images: finalImages };
       });
       toast.success("✅ Image uploaded successfully");
     } catch (error: any) {
+      // On failure: remove the local preview
+      setP((prev: Product) => {
+        const currentImages = (Array.isArray(prev.images) ? [...prev.images] : []).filter((u: string) => u !== localPreviewUrl);
+        URL.revokeObjectURL(localPreviewUrl);
+        return { ...prev, image_url: currentImages[0] || "", images: currentImages };
+      });
       console.error("❌ Image upload failed:", error);
       toast.error(error.message || "Failed to upload image");
     } finally {

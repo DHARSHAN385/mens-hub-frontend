@@ -160,12 +160,16 @@ class OrderSerializer(serializers.ModelSerializer):
             else:
                 data['customer_email'] = 'customer@menshub.com'
                 
+        # Use prefetched profile if available (avoid N+1 query)
         if not data.get('phone') and user:
+            phone = 'N/A'
             try:
-                profile = UserProfile.objects.get(user=user)
-                data['phone'] = profile.phone
-            except: 
-                data['phone'] = 'N/A'
+                # Access via cached OneToOne reverse relation (set by select_related in view)
+                if hasattr(user, 'profile') and user.profile:
+                    phone = user.profile.phone or 'N/A'
+            except Exception:
+                pass
+            data['phone'] = phone
         
         # Ensure items is always a list
         if isinstance(data.get('items'), str):

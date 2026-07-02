@@ -111,7 +111,7 @@ def user_orders(request):
     GET /api/me/orders/
     Get all orders for current user
     """
-    orders = Order.objects.filter(user=request.user).order_by('-created_at')
+    orders = Order.objects.filter(user=request.user).select_related('user__profile').order_by('-created_at')
     serializer = OrderSerializer(orders, many=True)
     return Response(serializer.data)
 
@@ -338,16 +338,25 @@ def admin_all_orders(request):
     """
     GET /api/admin/orders/
     Get all orders with customer information (Admin only)
+    Cached for 30s to reduce DB load on refresh
     """
     if not is_admin(request.user):
         return Response(
             {'error': 'Admin access required'},
             status=status.HTTP_403_FORBIDDEN
         )
+
+    cache_key = 'admin_all_orders'
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
     
-    orders = Order.objects.select_related('user').all().order_by('-created_at')
+    # select_related pre-fetches user and their profile in a single JOIN — eliminates N+1
+    orders = Order.objects.select_related('user', 'user__profile').all().order_by('-created_at')
     serializer = OrderSerializer(orders, many=True)
-    return Response(serializer.data)
+    data = serializer.data
+    cache.set(cache_key, data, timeout=30)  # 30-second cache for fast refresh
+    return Response(data)
 
 
 @api_view(['PATCH'])
@@ -390,6 +399,9 @@ def admin_update_order_status(request, order_id):
         if tracking_number:
             order.tracking_number = tracking_number
         order.save()
+        
+        # Invalidate admin orders cache so next load is fresh
+        cache.delete('admin_all_orders')
         
         print(f"✅ Order {order.order_number} updated to {status_value}")
         if tracking_number:
