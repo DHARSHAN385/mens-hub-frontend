@@ -4022,11 +4022,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
               className="px-4 py-2 text-sm uppercase tracking-wider"
               style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>+ Add</button>
           </div>
-          {dataLoading ? (
-            <div className="py-8 text-center text-neutral-500">
-              <div className="animate-pulse">📦 Loading products...</div>
-            </div>
-          ) : !products || products.length === 0 ? (
+          {!products || products.length === 0 ? (
             <div className="py-8 text-center text-neutral-500">
               <div>No products found. Click "+ Add" to create one.</div>
             </div>
@@ -4115,11 +4111,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
               className="px-4 py-2 text-sm uppercase tracking-wider"
               style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>+ Add Category</button>
           </div>
-          {dataLoading ? (
-            <div className="py-8 text-center text-neutral-500">
-              <div className="animate-pulse">📂 Loading categories...</div>
-            </div>
-          ) : !categories || categories.length === 0 ? (
+          {!categories || categories.length === 0 ? (
             <div className="py-8 text-center text-neutral-500">
               <div>No categories found. Click "+ Add Category" to create one.</div>
             </div>
