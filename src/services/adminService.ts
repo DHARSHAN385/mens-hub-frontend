@@ -190,9 +190,9 @@ export const saveProduct = async (product: any): Promise<any> => {
     }
 
     let image = product.images?.[0] || product.image_url || '';
-    // Don't send base64 images (too large), only send URLs
-    if (image && image.startsWith('data:image/')) {
-      console.warn('⚠ Skipping base64 image (too large), saving without image');
+    // Don't send base64 or blob images, only send URLs
+    if (image && (image.startsWith('data:image/') || image.startsWith('blob:'))) {
+      console.warn('⚠ Skipping base64 or blob image, saving without image');
       image = '';
     }
     const backendProduct: AdminProduct & { images?: string[]; custom_designs?: string[]; color_patterns?: string[] } = {
@@ -206,8 +206,8 @@ export const saveProduct = async (product: any): Promise<any> => {
       popularity: product.popularity || 0,
       featured: product.featured || false,
       in_stock: product.in_stock !== false,
-      images: Array.isArray(product.images) ? product.images.filter((img: string) => img && !img.startsWith('data:image/')) : [],
-      custom_designs: Array.isArray(product.custom_designs) ? product.custom_designs.filter((img: string) => img && !img.startsWith('data:image/')) : [],
+      images: Array.isArray(product.images) ? product.images.filter((img: string) => img && !img.startsWith('data:image/') && !img.startsWith('blob:')) : [],
+      custom_designs: Array.isArray(product.custom_designs) ? product.custom_designs.filter((img: string) => img && !img.startsWith('data:image/') && !img.startsWith('blob:')) : [],
       color_patterns: Array.isArray(product.color_patterns) ? product.color_patterns : []
     };
 
@@ -296,8 +296,9 @@ export const saveCategory = async (category: any): Promise<any> => {
     }
 
     let image = category.img || '';
-    if (image && image.startsWith('data:image/')) {
-      console.warn('⚠ Skipping base64 image (too large), saving without image');
+    // Don't send base64 or blob images, only send URLs
+    if (image && (image.startsWith('data:image/') || image.startsWith('blob:'))) {
+      console.warn('⚠ Skipping base64 or blob image, saving without image');
       image = '';
     }
     const backendCategory: AdminCategory = {

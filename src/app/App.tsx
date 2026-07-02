@@ -4875,38 +4875,60 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
       return;
     }
 
+    // 1. Generate local preview URLs immediately (< 1ms)
+    const localPreviews = Array.from(files).map(file => URL.createObjectURL(file));
+    setP((prev: Product) => ({
+      ...prev,
+      custom_designs: [...(prev.custom_designs || []), ...localPreviews]
+    }));
+
     setUploadingDesign(true);
     let successCount = 0;
-    const uploadedUrls: string[] = [];
 
+    // Process uploads in background
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const localUrl = localPreviews[i];
       try {
         const url = await adminService.uploadImage(file);
-        uploadedUrls.push(url);
+        setP((prev: Product) => {
+          const updatedDesigns = [...(prev.custom_designs || [])];
+          const idx = updatedDesigns.indexOf(localUrl);
+          if (idx >= 0) {
+            updatedDesigns[idx] = url;
+          } else {
+            updatedDesigns.push(url);
+          }
+          return { ...prev, custom_designs: updatedDesigns };
+        });
+        URL.revokeObjectURL(localUrl);
         successCount++;
       } catch (err: any) {
         console.error("Design upload failed:", err);
         toast.error(`Failed to upload design image ${i + 1}: ${err.message || 'Error'}`);
+        // Remove this local preview URL on failure
+        setP((prev: Product) => ({
+          ...prev,
+          custom_designs: (prev.custom_designs || []).filter(url => url !== localUrl)
+        }));
+        URL.revokeObjectURL(localUrl);
       }
     }
 
     if (successCount > 0) {
-      setP((prev: Product) => ({
-        ...prev,
-        custom_designs: [...(prev.custom_designs || []), ...uploadedUrls]
-      }));
       toast.success(`Successfully uploaded ${successCount} design image(s)`);
     }
     setUploadingDesign(false);
+    if (designFileRef.current) designFileRef.current.value = "";
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const finalImages = productImages.filter((img: string) => img && !img.startsWith('data:image/'));
+      const finalImages = productImages.filter((img: string) => img && !img.startsWith('data:image/') && !img.startsWith('blob:'));
       const finalImageUrl = finalImages[0] || "";
-      await onSave({ ...p, image_url: finalImageUrl, images: finalImages });
+      const finalDesigns = (p.custom_designs || []).filter((img: string) => img && !img.startsWith('data:image/') && !img.startsWith('blob:'));
+      await onSave({ ...p, image_url: finalImageUrl, images: finalImages, custom_designs: finalDesigns });
     } catch (err) {
       console.error("Product editor save error:", err);
     } finally {
@@ -5215,9 +5237,12 @@ function CategoryEditor({ category, onSave, onCancel, notifyTabsToRefresh }: any
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Show preview immediately
-    const url = await fileToDataURL(file);
-    setPreview(url);
+    // Show preview immediately using lightweight object URL (< 1ms)
+    if (preview && preview.startsWith('blob:')) {
+      URL.revokeObjectURL(preview);
+    }
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
 
     // Upload file in background
     setUploading(true);
@@ -5229,7 +5254,6 @@ function CategoryEditor({ category, onSave, onCancel, notifyTabsToRefresh }: any
     } catch (error: any) {
       console.error("❌ Image upload failed:", error);
       toast.error(error.message || "Failed to upload image");
-      // Keep the preview
     } finally {
       setUploading(false);
     }
@@ -5239,8 +5263,14 @@ function CategoryEditor({ category, onSave, onCancel, notifyTabsToRefresh }: any
     setSaving(true);
     try {
       const img = c.img || imageUrl || preview || '';
-      // Avoid saving base64 representations to database
-      const finalImg = img.startsWith('data:image/') ? '' : img;
+      // Avoid saving base64 or blob representations to database
+      const finalImg = (img.startsWith('data:image/') || img.startsWith('blob:')) ? '' : img;
+      
+      // Clean up local preview URL
+      if (preview && preview.startsWith('blob:')) {
+        URL.revokeObjectURL(preview);
+      }
+      
       await onSave({ ...c, img: finalImg });
     } catch (err) {
       console.error("Category editor save error:", err);
@@ -5372,6 +5402,37 @@ function BannerEditor({ bannerImg, setBannerImg, notifyTabsToRefresh }: any) {
   };
 
   const handleUpload = async (file: File) => {
+    // 1. Show INSTANT local preview (< 1ms)
+    const localPreviewUrl = URL.createObjectURL(file);
+    const oldDesktopUrl = desktopUrl;
+    const oldMobileUrl = mobileUrl;
+    
+    if (activeTab === "desktop") {
+      setDesktopUrl(localPreviewUrl);
+      setBannerImg(JSON.stringify({
+        desktop_url: localPreviewUrl,
+        mobile_url: mobileUrl,
+        desktop_zoom: desktopZoom,
+        desktop_x: desktopX,
+        desktop_y: desktopY,
+        mobile_zoom: mobileZoom,
+        mobile_x: mobileX,
+        mobile_y: mobileY,
+      }));
+    } else {
+      setMobileUrl(localPreviewUrl);
+      setBannerImg(JSON.stringify({
+        desktop_url: desktopUrl,
+        mobile_url: localPreviewUrl,
+        desktop_zoom: desktopZoom,
+        desktop_x: desktopX,
+        desktop_y: desktopY,
+        mobile_zoom: mobileZoom,
+        mobile_x: mobileX,
+        mobile_y: mobileY,
+      }));
+    }
+
     setUploading(true);
     try {
       const uploadedUrl = await adminService.uploadImage(file);
@@ -5382,7 +5443,25 @@ function BannerEditor({ bannerImg, setBannerImg, notifyTabsToRefresh }: any) {
         setMobileUrl(uploadedUrl);
         await saveSettings({ mobile_url: uploadedUrl });
       }
+      URL.revokeObjectURL(localPreviewUrl);
+      toast.success("✅ Banner image uploaded successfully");
     } catch (error: any) {
+      if (activeTab === "desktop") {
+        setDesktopUrl(oldDesktopUrl);
+      } else {
+        setMobileUrl(oldMobileUrl);
+      }
+      setBannerImg(JSON.stringify({
+        desktop_url: oldDesktopUrl,
+        mobile_url: oldMobileUrl,
+        desktop_zoom: desktopZoom,
+        desktop_x: desktopX,
+        desktop_y: desktopY,
+        mobile_zoom: mobileZoom,
+        mobile_x: mobileX,
+        mobile_y: mobileY,
+      }));
+      URL.revokeObjectURL(localPreviewUrl);
       console.error("❌ Image upload failed:", error);
       toast.error(error.message || "Failed to upload image");
     } finally {
