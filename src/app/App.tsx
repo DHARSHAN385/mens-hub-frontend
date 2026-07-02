@@ -3765,26 +3765,49 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
 
   const saveProduct = async (p: Product) => {
     setSaving(true);
+    const previousProducts = [...products];
+
+    let categoryId = p.category;
+    const catObj = categories.find((c: Category) => String(c.id) === String(p.category) || c.name.toLowerCase() === String(p.category).toLowerCase());
+    if (catObj) categoryId = catObj.id;
+    
+    const isNew = !p.id;
+    const tempId = p.id || `temp-${Date.now()}`;
+    const optimisticProduct = {
+      ...p,
+      id: tempId,
+      category: categoryId,
+      popularity: p.popularity ?? 5,
+      in_stock: p.in_stock !== false,
+      featured: p.featured || false
+    };
+
+    // Update UI immediately (1ms)
+    setProducts((arr: Product[]) => {
+      const idx = arr.findIndex(x => String(x.id) === String(p.id));
+      if (idx >= 0) { const c = [...arr]; c[idx] = optimisticProduct; return c; }
+      return [...arr, optimisticProduct];
+    });
+    
+    setEditingProduct(null);
+    setQ("");
+    toast.success(isNew ? "Adding product..." : "Updating product...");
+    notifyTabsToRefresh();
+
     try {
-      let categoryId = p.category;
-      const catObj = categories.find((c: Category) => String(c.id) === String(p.category) || c.name.toLowerCase() === String(p.category).toLowerCase());
-      if (catObj) categoryId = catObj.id;
       const safeProduct = { ...p, category: categoryId };
       const saved = await adminService.saveProduct(safeProduct);
+      
+      // Update with backend response
       setProducts((arr: Product[]) => {
-        const idx = arr.findIndex(x => x.id === p.id);
+        const idx = arr.findIndex(x => String(x.id) === String(tempId));
         if (idx >= 0) { const c = [...arr]; c[idx] = saved; return c; }
-        return [...arr, saved];
+        return arr;
       });
-      notifyTabsToRefresh();
-      // Ensure modal closes properly
-      setEditingProduct(null);
-      // Reset search to show updated product
-      setQ("");
-      toast.success("Product saved to database ✓");
     } catch (err: any) {
       console.error("Failed to save product:", err);
-      toast.error(err?.message || "Failed to save product");
+      toast.error("Failed to save product. Rolling back changes.");
+      setProducts(previousProducts);
     } finally {
       setSaving(false);
     }
@@ -3792,14 +3815,19 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
 
   const deleteProduct = async (id: any) => {
     setSaving(true);
+    const previousProducts = [...products];
+
+    // Update UI immediately (1ms)
+    setProducts((arr: Product[]) => arr.filter(p => p.id !== id));
+    toast.success("Deleting product...");
+    notifyTabsToRefresh();
+
     try {
       await adminService.deleteProductFromDB(id);
-      setProducts((arr: Product[]) => arr.filter(p => p.id !== id));
-      notifyTabsToRefresh();
-      toast.success("Product deleted from database ✓");
     } catch (err: any) {
       console.error("Failed to delete product:", err);
-      toast.error(err?.message || "Failed to delete product");
+      toast.error("Failed to delete product. Rolling back.");
+      setProducts(previousProducts);
     } finally {
       setSaving(false);
     }
@@ -3807,19 +3835,31 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
 
   const saveCategory = async (c: Category) => {
     setSaving(true);
+    const previousCategories = [...categories];
+    const tempId = c.id || `temp-${Date.now()}`;
+    const optimisticCategory = { ...c, id: tempId };
+
+    // Update UI immediately (1ms)
+    setCategories((arr: Category[]) => {
+      const idx = arr.findIndex(x => String(x.id) === String(c.id));
+      if (idx >= 0) { const copy = [...arr]; copy[idx] = optimisticCategory; return copy; }
+      return [...arr, optimisticCategory];
+    });
+    setEditingCategory(null);
+    toast.success(c.id ? "Updating category..." : "Adding category...");
+    notifyTabsToRefresh();
+
     try {
       const saved = await adminService.saveCategory(c);
       setCategories((arr: Category[]) => {
-        const idx = arr.findIndex(x => x.id === c.id);
+        const idx = arr.findIndex(x => String(x.id) === String(tempId));
         if (idx >= 0) { const copy = [...arr]; copy[idx] = saved; return copy; }
-        return [...arr, saved];
+        return arr;
       });
-      notifyTabsToRefresh();
-      setEditingCategory(null);
-      toast.success("Category saved to database ✓");
     } catch (err: any) {
       console.error("Failed to save category:", err);
-      toast.error(err?.message || "Failed to save category");
+      toast.error("Failed to save category. Rolling back changes.");
+      setCategories(previousCategories);
     } finally {
       setSaving(false);
     }
@@ -3827,14 +3867,19 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
 
   const deleteCategory = async (id: any) => {
     setSaving(true);
+    const previousCategories = [...categories];
+
+    // Update UI immediately (1ms)
+    setCategories((arr: Category[]) => arr.filter(c => c.id !== id));
+    toast.success("Deleting category...");
+    notifyTabsToRefresh();
+
     try {
       await adminService.deleteCategoryFromDB(id);
-      setCategories((arr: Category[]) => arr.filter(c => c.id !== id));
-      notifyTabsToRefresh();
-      toast.success("Category deleted from database ✓");
     } catch (err: any) {
       console.error("Failed to delete category:", err);
-      toast.error(err?.message || "Failed to delete category");
+      toast.error("Failed to delete category. Rolling back.");
+      setCategories(previousCategories);
     } finally {
       setSaving(false);
     }
@@ -3986,45 +4031,47 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
                     {/* Quick Featured Toggle */}
                     <button
                       onClick={async () => {
+                        const previousProducts = [...products];
                         const updated = { ...p, featured: !p.featured };
-                        setSaving(true);
+                        
+                        // Update UI immediately (1ms)
+                        setProducts((arr: Product[]) => arr.map(x => x.id === p.id ? updated : x));
+                        toast.success(p.featured ? "Removed from Featured ✓" : "Added to Featured ✓");
+                        notifyTabsToRefresh();
+
                         try {
                           await adminService.saveProduct(updated);
-                          setProducts((arr: Product[]) => arr.map(x => x.id === p.id ? updated : x));
-                          notifyTabsToRefresh();
-                          toast.success(p.featured ? "Removed from Featured ✓" : "Added to Featured ✓");
                         } catch (err) {
-                          toast.error("Failed to update featured status");
-                        } finally {
-                          setSaving(false);
+                          toast.error("Failed to update featured status. Rolling back.");
+                          setProducts(previousProducts);
                         }
                       }}
-                      disabled={saving}
                       title={p.featured ? "Remove from Featured" : "Mark as Featured"}
-                      className="p-2 rounded-md transition-all text-xs"
-                      style={p.featured ? { background: "var(--accent-grad)", color: "var(--accent-fg)", fontWeight: 700, border: "1px solid var(--accent)", opacity: saving ? 0.5 : 1 } : { border: "1px solid var(--accent)", color: "var(--accent)", opacity: saving ? 0.5 : 1 }}>
+                      className="p-2 rounded-md transition-all text-xs hover:scale-105 active:scale-95"
+                      style={p.featured ? { background: "var(--accent-grad)", color: "var(--accent-fg)", fontWeight: 700, border: "1px solid var(--accent)" } : { border: "1px solid var(--accent)", color: "var(--accent)" }}>
                       ★
                     </button>
                     {/* Quick In-Stock Toggle */}
                     <button
                       onClick={async () => {
+                        const previousProducts = [...products];
                         const updated = { ...p, in_stock: p.in_stock === false ? true : false };
-                        setSaving(true);
+
+                        // Update UI immediately (1ms)
+                        setProducts((arr: Product[]) => arr.map(x => x.id === p.id ? updated : x));
+                        toast.success(updated.in_stock ? "Marked as In Stock ✓" : "Marked as Out of Stock ✓");
+                        notifyTabsToRefresh();
+
                         try {
                           await adminService.saveProduct(updated);
-                          setProducts((arr: Product[]) => arr.map(x => x.id === p.id ? updated : x));
-                          notifyTabsToRefresh();
-                          toast.success(updated.in_stock ? "Marked as In Stock ✓" : "Marked as Out of Stock ✓");
                         } catch (err) {
-                          toast.error("Failed to update stock status");
-                        } finally {
-                          setSaving(false);
+                          toast.error("Failed to update stock status. Rolling back.");
+                          setProducts(previousProducts);
                         }
                       }}
-                      disabled={saving}
                       title={p.in_stock !== false ? "Mark as Out of Stock" : "Mark as In Stock"}
-                      className="px-3 py-2 rounded-md transition-all text-xs font-bold uppercase tracking-wider"
-                      style={p.in_stock !== false ? { background: "var(--accent-grad)", color: "var(--accent-fg)", border: "1px solid var(--accent)", opacity: saving ? 0.5 : 1 } : { border: "1px solid var(--accent)", color: "var(--accent)", opacity: saving ? 0.5 : 1 }}>
+                      className="px-3 py-2 rounded-md transition-all text-xs font-bold uppercase tracking-wider hover:scale-105 active:scale-95"
+                      style={p.in_stock !== false ? { background: "var(--accent-grad)", color: "var(--accent-fg)", border: "1px solid var(--accent)" } : { border: "1px solid var(--accent)", color: "var(--accent)" }}>
                       {p.in_stock !== false ? "In Stock" : "Out of Stock"}
                     </button>
                     <button onClick={() => setEditingProduct(p)} className="p-2 rounded-md" style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}><Edit2 size={14} /></button>
