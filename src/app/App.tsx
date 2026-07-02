@@ -1671,6 +1671,42 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
   const fallbackBanner = CONFIG.FALLBACK_BANNER;
   const fallbackCategory = CONFIG.FALLBACK_CATEGORY;
 
+  // Dynamically inject responsive preload link tags for the active hero banner to eliminate LCP delay
+  useEffect(() => {
+    const config = parseBannerConfig(bannerImg);
+    const desktopUrl = optimizeImageUrl(config.desktop_url || fallbackBanner, 1200);
+    const mobileUrl = optimizeImageUrl(config.mobile_url || fallbackBanner, 600);
+
+    // Create preload link elements
+    const desktopLink = document.createElement("link");
+    desktopLink.rel = "preload";
+    desktopLink.as = "image";
+    desktopLink.href = desktopUrl;
+    desktopLink.type = "image/webp";
+    desktopLink.media = "(min-width: 768px)";
+    desktopLink.setAttribute("fetchpriority", "high");
+    desktopLink.id = "dynamic-preload-desktop";
+
+    const mobileLink = document.createElement("link");
+    mobileLink.rel = "preload";
+    mobileLink.as = "image";
+    mobileLink.href = mobileUrl;
+    mobileLink.type = "image/webp";
+    mobileLink.media = "(max-width: 767px)";
+    mobileLink.setAttribute("fetchpriority", "high");
+    mobileLink.id = "dynamic-preload-mobile";
+
+    // Append to head
+    document.head.appendChild(desktopLink);
+    document.head.appendChild(mobileLink);
+
+    // Clean up on unmount
+    return () => {
+      document.getElementById("dynamic-preload-desktop")?.remove();
+      document.getElementById("dynamic-preload-mobile")?.remove();
+    };
+  }, [bannerImg, fallbackBanner]);
+
   return (
     <div className="max-w-7xl mx-auto px-4">
       {/* Visually hidden h1 for SEO and heading structure outline */}
