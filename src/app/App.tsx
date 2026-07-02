@@ -3626,7 +3626,17 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [q, setQ] = useState("");
   const [saving, setSaving] = useState(false);
-  const [orders, setOrders] = useState<any[]>([]);
+  // Pre-load orders from localStorage instantly — no spinner on first open
+  const [orders, setOrders] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('adminOrdersCache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [];
+  });
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [viewingOrder, setViewingOrder] = useState<any | null>(null);
@@ -3634,7 +3644,6 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
   const [largeImagePreview, setLargeImagePreview] = useState<string | null>(null);
   const [trackingId, setTrackingId] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [dataLoading, setDataLoading] = useState(false);
   const openedOrderIdRef = useRef<any>(null);
 
   // Synchronize props to state if they change (e.g. clicking notification)
@@ -3666,18 +3675,11 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
     }
   }, [initialOrderId, tab, orders, loadingOrders]);
 
-  // Load products/categories: serve from cache instantly, then refresh in background
+  // Products and categories are already in props from App state — NO re-fetch needed.
+  // A silent background refresh runs after 2s so the admin always sees fresh data
+  // without any loading delay.
   useEffect(() => {
-    const loadAdminData = async () => {
-      // Step 1: Serve from in-memory cache instantly (no loading spinner needed)
-      const [cachedProducts, cachedCategories] = await Promise.all([
-        adminService.loadProductsFromDB(false), // use cache if available
-        adminService.loadCategoriesFromDB(false)
-      ]);
-      if (cachedProducts && cachedProducts.length > 0) setProducts(cachedProducts);
-      if (cachedCategories && cachedCategories.length > 0) setCategories(cachedCategories);
-
-      // Step 2: Silently refresh in background (no spinner, no blocking)
+    const refreshTimer = setTimeout(async () => {
       try {
         const [freshProducts, freshCategories] = await Promise.all([
           adminService.loadProductsFromDB(true),
@@ -3686,37 +3688,21 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
         if (freshProducts && freshProducts.length > 0) setProducts(freshProducts);
         if (freshCategories && freshCategories.length > 0) setCategories(freshCategories);
       } catch (err) {
-        console.warn('Background refresh failed (showing cached data):', err);
-      } finally {
-        setDataLoading(false);
+        console.warn('Admin background refresh failed:', err);
       }
-    };
+    }, 2000); // 2-second delay so UI is fully ready first
+    return () => clearTimeout(refreshTimer);
+  }, []); // once on mount
 
-    loadAdminData();
-  }, []); // Load once on mount
-
-  // Listen for updates from other tabs
+  // Listen for updates from other tabs — refresh silently in background
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'refreshData') {
-        console.log('🔄 AdminPanel: Detected refresh from another tab, reloading data...');
-        const loadAdminData = async () => {
-          try {
-            const [dbProducts, dbCategories] = await Promise.all([
-              adminService.loadProductsFromDB(true), // Force fresh load
-              adminService.loadCategoriesFromDB(true) // Force fresh load
-            ]);
-
-            if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
-            if (dbCategories && dbCategories.length > 0) setCategories(dbCategories);
-          } catch (err) {
-            console.error('Failed to refresh data:', err);
-          }
-        };
-        loadAdminData();
+        // Silent background refresh — no spinner
+        adminService.loadProductsFromDB(true).then(p => { if (p?.length > 0) setProducts(p); }).catch(() => {});
+        adminService.loadCategoriesFromDB(true).then(c => { if (c?.length > 0) setCategories(c); }).catch(() => {});
       }
     };
-
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [setProducts, setCategories]);
@@ -3992,10 +3978,17 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
     }
   };
 
-  // Fetch orders when orders tab is opened — cache shows instantly, then refreshes in background
+  // When orders tab opens: if cache already loaded (state has data), just refresh silently.
+  // If no cache (first ever load), fetch normally.
   useEffect(() => {
     if (tab === 'orders') {
-      fetchOrders(false); // show cache instantly, then update
+      if (orders.length === 0) {
+        // No cache yet — do a real fetch with loading indicator
+        fetchOrders(false);
+      } else {
+        // Already have data — silently refresh in background
+        fetchOrders(true);
+      }
     }
   }, [tab]);
 
@@ -4004,7 +3997,6 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
       <div className="flex items-center gap-3 my-4">
         <button onClick={onBack} className="p-2 -ml-2" aria-label="Go back"><ChevronLeft size={20} /></button>
         <h2 className="uppercase tracking-[0.2em]">Admin Panel</h2>
-        {dataLoading && <span className="text-xs text-neutral-500 animate-pulse">📡 Loading data...</span>}
       </div>
       <div className="flex gap-2 mb-6">
         {([
