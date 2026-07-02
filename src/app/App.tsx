@@ -3666,28 +3666,27 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
     }
   }, [initialOrderId, tab, orders, loadingOrders]);
 
-  // Load data directly from database when AdminPanel first loads
-  // This ensures each tab has its own fresh data, preventing cross-tab conflicts
+  // Load products/categories: serve from cache instantly, then refresh in background
   useEffect(() => {
     const loadAdminData = async () => {
-      setDataLoading(true);
-      try {
-        const [dbProducts, dbCategories] = await Promise.all([
-          adminService.loadProductsFromDB(true), // Force fresh load
-          adminService.loadCategoriesFromDB(true) // Force fresh load
-        ]);
+      // Step 1: Serve from in-memory cache instantly (no loading spinner needed)
+      const [cachedProducts, cachedCategories] = await Promise.all([
+        adminService.loadProductsFromDB(false), // use cache if available
+        adminService.loadCategoriesFromDB(false)
+      ]);
+      if (cachedProducts && cachedProducts.length > 0) setProducts(cachedProducts);
+      if (cachedCategories && cachedCategories.length > 0) setCategories(cachedCategories);
 
-        if (dbProducts && dbProducts.length > 0) {
-          setProducts(dbProducts);
-          console.log('✅ AdminPanel: Loaded', dbProducts.length, 'products from DB');
-        }
-        if (dbCategories && dbCategories.length > 0) {
-          setCategories(dbCategories);
-          console.log('✅ AdminPanel: Loaded', dbCategories.length, 'categories from DB');
-        }
+      // Step 2: Silently refresh in background (no spinner, no blocking)
+      try {
+        const [freshProducts, freshCategories] = await Promise.all([
+          adminService.loadProductsFromDB(true),
+          adminService.loadCategoriesFromDB(true)
+        ]);
+        if (freshProducts && freshProducts.length > 0) setProducts(freshProducts);
+        if (freshCategories && freshCategories.length > 0) setCategories(freshCategories);
       } catch (err) {
-        console.error('❌ AdminPanel: Failed to load data from DB:', err);
-        toast.error('Failed to load admin data from database');
+        console.warn('Background refresh failed (showing cached data):', err);
       } finally {
         setDataLoading(false);
       }
@@ -3723,40 +3722,45 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
   }, [setProducts, setCategories]);
 
 
-  // Add updateOrderStatus function for order status updates
+  // updateOrderStatus: FULLY OPTIMISTIC — update UI instantly, sync to DB in background
   const updateOrderStatus = async (orderId: any, newStatus: string) => {
+    // 1. Update UI immediately — zero wait
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+    );
+    setViewingOrder((prev: any) =>
+      prev && prev.id === orderId ? { ...prev, status: newStatus } : prev
+    );
+    // Update localStorage cache too
+    try {
+      const cached = localStorage.getItem('adminOrdersCache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const updated = parsed.map((o: any) => o.id === orderId ? { ...o, status: newStatus } : o);
+        localStorage.setItem('adminOrdersCache', JSON.stringify(updated));
+      }
+    } catch {}
+    toast.success(`✅ Order updated to ${newStatus.replace(/_/g, ' ').toUpperCase()}`);
+
+    // 2. Persist to DB in background — no spinner, no blocking
     setUpdatingStatus(true);
     try {
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
-
       const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
       const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/status/`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Token ${authToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Token ${authToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-
-      if (response.ok) {
-        const updatedOrder = await response.json();
-        setOrders((prev) =>
-          prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-        );
-        setViewingOrder((prev: any) =>
-          prev && prev.id === orderId ? { ...prev, status: newStatus } : prev
-        );
-        toast.success(`✅ Order updated to ${newStatus.replace('_', ' ').toUpperCase()}`);
-        // Re-fetch to ensure live update
-        await fetchOrders();
-      } else {
-        toast.error('Failed to update order status');
+      if (!response.ok) {
+        // Rollback on failure
+        toast.error('Failed to update order. Please try again.');
+        fetchOrders(); // refresh to get true state
       }
     } catch (error) {
       console.error('Error updating order:', error);
-      toast.error('Error updating order status');
+      toast.error('Network error updating order');
     } finally {
       setUpdatingStatus(false);
     }
@@ -3886,23 +3890,36 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
   };
 
   // ===== ORDER MANAGEMENT =====
-  const fetchOrders = async () => {
-    setLoadingOrders(true);
+  const fetchOrders = async (background = false) => {
+    if (!background) setLoadingOrders(true);
     try {
+      // Serve from localStorage cache INSTANTLY
+      if (!background) {
+        try {
+          const cached = localStorage.getItem('adminOrdersCache');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setOrders(parsed);
+              setLoadingOrders(false); // Hide spinner immediately
+            }
+          }
+        } catch {}
+      }
+
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
       const response = await fetch(`${API_URL}/api/admin/orders/`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Token ${authToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Token ${authToken}`, 'Content-Type': 'application/json' },
       });
       if (response.ok) {
         const data = await response.json();
         setOrders(data);
+        // Cache for next instant load
+        try { localStorage.setItem('adminOrdersCache', JSON.stringify(data)); } catch {}
       }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
@@ -3936,7 +3953,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
       });
 
       if (response.ok) {
-        const updatedOrder = await response.json();
+        // Update UI instantly — no re-fetch needed
         setOrders((prev) =>
           prev.map((o) =>
             o.id === selectedOrder
@@ -3944,12 +3961,26 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
               : o
           )
         );
+        setViewingOrder((prev: any) =>
+          prev && prev.id === selectedOrder
+            ? { ...prev, status: 'out_for_delivery', tracking_number: trackingId }
+            : prev
+        );
         toast.success(`✅ Order marked as Out for Delivery | Tracking: ${trackingId}`);
         setShowTrackingModal(false);
         setTrackingId('');
         setSelectedOrder(null);
-        // Re-fetch to ensure live update
-        await fetchOrders();
+        // Update cache silently
+        try {
+          const cached = localStorage.getItem('adminOrdersCache');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            const updated = parsed.map((o: any) =>
+              o.id === selectedOrder ? { ...o, status: 'out_for_delivery', tracking_number: trackingId } : o
+            );
+            localStorage.setItem('adminOrdersCache', JSON.stringify(updated));
+          }
+        } catch {}
       } else {
         toast.error('Failed to update order status');
       }
@@ -3961,10 +3992,10 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
     }
   };
 
-  // Fetch orders when orders tab is opened
+  // Fetch orders when orders tab is opened — cache shows instantly, then refreshes in background
   useEffect(() => {
     if (tab === 'orders') {
-      fetchOrders();
+      fetchOrders(false); // show cache instantly, then update
     }
   }, [tab]);
 
