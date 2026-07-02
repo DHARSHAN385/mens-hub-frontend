@@ -17,6 +17,22 @@ from typing import Any
 from django.utils import timezone
 from api.services import create_order_notification  # Import notification service
 from datetime import datetime, timedelta
+from django.core.cache import cache
+
+
+def clear_product_cache():
+    """Clear all cached variations of the products list."""
+    product_keys = cache.get('product_cache_keys', set())
+    for key in product_keys:
+        cache.delete(key)
+    cache.delete('product_cache_keys')
+    cache.delete('products_list')
+
+
+def clear_category_cache():
+    """Clear category cache and also invalidate product cache (due to nested category info)."""
+    cache.delete('categories_list')
+    clear_product_cache()
 
 
 # Permission Classes
@@ -67,20 +83,34 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
+
+    def list(self, request, *args, **kwargs):
+        """List all categories with caching."""
+        cache_key = 'categories_list'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, timeout=3600)  # cache for 1 hour
+        return response
     
     def perform_create(self, serializer):
-        """Save category to database."""
+        """Save category to database and clear cache."""
         serializer.save()
+        clear_category_cache()
     
     def perform_update(self, serializer):
-        """Update category in database - PERMANENT."""
+        """Update category in database - PERMANENT and clear cache."""
         instance = serializer.save()
         print(f"✓ Category updated: {instance.id} - {instance.name}")
+        clear_category_cache()
     
     def perform_destroy(self, instance):
-        """Delete category from database - PERMANENT."""
+        """Delete category from database - PERMANENT and clear cache."""
         print(f"✓ Category deleted: {instance.id} - {instance.name}")
         instance.delete()
+        clear_category_cache()
 
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -104,20 +134,43 @@ class ProductViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(featured=True)
             
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        """List all products with query param caching."""
+        category = request.query_params.get('category', '')
+        featured = request.query_params.get('featured', '')
+        cache_key = f'products_list_cat_{category}_feat_{featured}'
+        
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+            
+        response = super().list(request, *args, **kwargs)
+        
+        # Track cache keys to invalidate later
+        product_keys = cache.get('product_cache_keys', set())
+        product_keys.add(cache_key)
+        cache.set('product_cache_keys', product_keys, timeout=86400)
+        
+        cache.set(cache_key, response.data, timeout=3600)  # cache for 1 hour
+        return response
     
     def perform_create(self, serializer):
-        """Save product to database."""
+        """Save product to database and clear cache."""
         serializer.save()
+        clear_product_cache()
     
     def perform_update(self, serializer):
-        """Update product in database - PERMANENT."""
+        """Update product in database - PERMANENT and clear cache."""
         instance = serializer.save()
         print(f"✓ Product updated: {instance.id} - {instance.name}")
+        clear_product_cache()
     
     def perform_destroy(self, instance):
-        """Delete product from database - PERMANENT."""
+        """Delete product from database - PERMANENT and clear cache."""
         print(f"✓ Product deleted: {instance.id} - {instance.name}")
         instance.delete()
+        clear_product_cache()
     
     @action(detail=False, methods=['get'])
     def featured(self, request):

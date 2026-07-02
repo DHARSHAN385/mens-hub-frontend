@@ -4833,13 +4833,17 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
     setUploadingDesign(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaving(true);
-    const finalImages = productImages.filter((img: string) => img && !img.startsWith('data:image/'));
-    const finalImageUrl = finalImages[0] || "";
-    onSave({ ...p, image_url: finalImageUrl, images: finalImages });
-    // Reset saving state after save completes
-    setTimeout(() => setSaving(false), 500);
+    try {
+      const finalImages = productImages.filter((img: string) => img && !img.startsWith('data:image/'));
+      const finalImageUrl = finalImages[0] || "";
+      await onSave({ ...p, image_url: finalImageUrl, images: finalImages });
+    } catch (err) {
+      console.error("Product editor save error:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -5163,14 +5167,18 @@ function CategoryEditor({ category, onSave, onCancel, notifyTabsToRefresh }: any
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaving(true);
-    const img = c.img || imageUrl || preview || '';
-    // Avoid saving base64 representations to database
-    const finalImg = img.startsWith('data:image/') ? '' : img;
-    onSave({ ...c, img: finalImg });
-    // Reset saving state after save completes
-    setTimeout(() => setSaving(false), 500);
+    try {
+      const img = c.img || imageUrl || preview || '';
+      // Avoid saving base64 representations to database
+      const finalImg = img.startsWith('data:image/') ? '' : img;
+      await onSave({ ...c, img: finalImg });
+    } catch (err) {
+      console.error("Category editor save error:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

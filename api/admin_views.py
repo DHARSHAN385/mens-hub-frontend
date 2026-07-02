@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.db.models import Count, Sum, Q
 from django.utils import timezone
 from datetime import timedelta
+from django.core.cache import cache
 
 from .models import (
     Order, Cart, Wishlist, Address, UserProfile, 
@@ -177,7 +178,7 @@ def is_admin(user):
 def admin_customers_list(request):
     """
     GET /api/admin/customers/
-    Get list of all customers (Admin only)
+    Get list of all customers (Admin only) - Optimized query to avoid N+1 issues
     """
     if not is_admin(request.user):
         return Response(
@@ -185,21 +186,38 @@ def admin_customers_list(request):
             status=status.HTTP_403_FORBIDDEN
         )
     
-    # Get all non-admin users
-    customers = User.objects.filter(is_staff=False)
+    # Fetch customers with user profile in a single query
+    customers = User.objects.filter(is_staff=False).select_related('profile')
     
+    # Fetch all orders for these customers in a single query
+    orders = Order.objects.filter(user__in=customers)
+    
+    # Group orders by user_id
+    from collections import defaultdict
+    orders_by_user = defaultdict(list)
+    for order in orders:
+        orders_by_user[order.user_id].append(order)
+        
     customers_data = []
     for customer in customers:
-        orders = Order.objects.filter(user=customer)
-        total_spent = sum(o.total_amount for o in orders)
-        last_order = orders.order_by('-created_at').first()
+        user_orders = orders_by_user[customer.id]
+        total_spent = sum(o.total_amount for o in user_orders)
         
+        # Sort in memory to find the last order
+        user_orders.sort(key=lambda o: o.created_at, reverse=True)
+        last_order = user_orders[0] if user_orders else None
+        
+        # Safe access to profile
+        phone = None
+        if hasattr(customer, 'profile') and customer.profile:
+            phone = customer.profile.phone
+            
         customers_data.append({
             'id': customer.id,
             'email': customer.email,
             'name': customer.get_full_name() or customer.username,
-            'phone': getattr(customer.profile, 'phone', None) if hasattr(customer, 'profile') else None,
-            'orders_count': orders.count(),
+            'phone': phone,
+            'orders_count': len(user_orders),
             'total_spent': float(total_spent),
             'last_order_date': last_order.created_at if last_order else None,
             'date_joined': customer.date_joined,
@@ -611,13 +629,20 @@ def upload_image(request):
 @api_view(['GET', 'POST'])
 def admin_banner_setting(request):
     """
-    GET /api/settings/banner/ - Get active banner URL
-    POST /api/settings/banner/ - Update active banner URL
+    GET /api/settings/banner/ - Get active banner URL (Cached)
+    POST /api/settings/banner/ - Update active banner URL (Invalidates Cache)
     """
     if request.method == 'GET':
+        cache_key = 'active_banner'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+
         # Get the latest active banner
         banner = Banner.objects.filter(is_active=True).first()
-        return Response({'banner_url': banner.image_url if banner else ''})
+        data = {'banner_url': banner.image_url if banner else ''}
+        cache.set(cache_key, data, timeout=3600)  # cache for 1 hour
+        return Response(data)
     
     elif request.method == 'POST':
         # Admin access check
@@ -645,5 +670,8 @@ def admin_banner_setting(request):
                 title='Primary Banner',
                 is_active=True
             )
+            
+        # Invalidate banner cache
+        cache.delete('active_banner')
             
         return Response({'success': True, 'banner_url': banner_url})

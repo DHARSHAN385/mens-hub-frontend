@@ -213,4 +213,21 @@ WS_URL = config('WS_URL', default='ws://localhost:8000')
 ADMIN_WS_TOKEN = config('ADMIN_WS_TOKEN', default='admin-token-change-in-production')
 
 
+# ============================================================================
+# CACHE CONFIGURATION
+# ============================================================================
+# File-based cache is shared across Gunicorn workers and uses local container storage.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': os.path.join(BASE_DIR, 'django_cache'),
+        'TIMEOUT': 3600,  # 1 hour default timeout
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000
+        }
+    }
+}
+
+
+
 
