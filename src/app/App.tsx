@@ -30,13 +30,14 @@ async function migrateLocalToDB() {
 }
 import { Toaster, toast } from "sonner";
 import logoImg from "../imports/image-11.png";
-import { GoogleLogin } from "../components/GoogleLogin";
-import { AuthForm } from "../components/AuthForm";
-import { AdminOrderNotificationCenter } from "../components/AdminOrderNotificationCenter";
 import adminService from "../services/adminService";
 
+// Lazy-load heavy components — NOT needed for initial paint
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const Policies = lazy(() => import("./pages/Policies"));
+const GoogleLogin = lazy(() => import("../components/GoogleLogin").then(m => ({ default: m.GoogleLogin })));
+const AuthForm = lazy(() => import("../components/AuthForm").then(m => ({ default: m.AuthForm })));
+const AdminOrderNotificationCenter = lazy(() => import("../components/AdminOrderNotificationCenter").then(m => ({ default: m.AdminOrderNotificationCenter })));
 import {
   Search, ShoppingBag, User, Heart, Home, Grid3x3, Package,
   Menu, X, Plus, Minus, Trash2, ChevronRight, MapPin, Phone, Mail,
@@ -1773,7 +1774,7 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                     style={{ border: "1px solid var(--accent)" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
-                    <img src={optimizeImageUrl(c.img || fallbackCategory, 200)} className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackCategory, 200); }} />
+                    <img src={optimizeImageUrl(c.img || fallbackCategory, 200)} className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" decoding="async" alt={c.name} width="200" height="200" onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackCategory, 200); }} />
                   </div>
                   <div className="mt-2 text-center text-sm uppercase tracking-wider" style={{ fontWeight: 600, color: "var(--accent)" }}>{c.name}</div>
                 </button>

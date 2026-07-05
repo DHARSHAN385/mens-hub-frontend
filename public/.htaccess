@@ -1,4 +1,9 @@
-# 1. HTML5 History Mode URL Rewriting (React Router support)
+# ========================================================
+# Mens Hub — High Performance .htaccess for Hostinger
+# Fixes: Caching, Gzip, SPA routing, Security headers
+# ========================================================
+
+# ── 1. SPA Routing (React Router — prevents 404 on refresh) ────────────────
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
@@ -8,53 +13,95 @@
   RewriteRule . /index.html [L]
 </IfModule>
 
-# 2. Enable Gzip Compression (reduces JS/CSS delivery sizes drastically)
+# ── 2. Gzip / Brotli Compression (reduces file sizes by 70%) ───────────────
 <IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/plain
   AddOutputFilterByType DEFLATE text/html
-  AddOutputFilterByType DEFLATE text/xml
   AddOutputFilterByType DEFLATE text/css
-  AddOutputFilterByType DEFLATE application/xml
-  AddOutputFilterByType DEFLATE application/xhtml+xml
-  AddOutputFilterByType DEFLATE application/rss+xml
+  AddOutputFilterByType DEFLATE text/javascript
   AddOutputFilterByType DEFLATE application/javascript
   AddOutputFilterByType DEFLATE application/x-javascript
+  AddOutputFilterByType DEFLATE application/json
+  AddOutputFilterByType DEFLATE application/xml
   AddOutputFilterByType DEFLATE image/svg+xml
-  AddOutputFilterByType DEFLATE image/x-icon
+  AddOutputFilterByType DEFLATE text/plain
+  AddOutputFilterByType DEFLATE text/xml
+  AddOutputFilterByType DEFLATE font/ttf
+  AddOutputFilterByType DEFLATE font/woff
+  AddOutputFilterByType DEFLATE font/woff2
 </IfModule>
 
-# 3. Leverage Browser Caching (sets cache lifetimes for static assets)
+# ── 3. Browser Caching (fixes "Use efficient cache lifetimes" warning) ──────
 <IfModule mod_expires.c>
   ExpiresActive On
-  
-  # Images (cache for 1 year)
-  ExpiresByType image/jpeg "access plus 1 year"
-  ExpiresByType image/gif "access plus 1 year"
-  ExpiresByType image/png "access plus 1 year"
-  ExpiresByType image/webp "access plus 1 year"
-  ExpiresByType image/svg+xml "access plus 1 year"
-  ExpiresByType image/x-icon "access plus 1 year"
-  
-  # CSS, JavaScript (cache for 1 month)
-  ExpiresByType text/css "access plus 1 month"
-  ExpiresByType application/javascript "access plus 1 month"
-  ExpiresByType application/x-javascript "access plus 1 month"
-  
-  # Fonts (cache for 1 year)
-  ExpiresByType font/ttf "access plus 1 year"
-  ExpiresByType font/woff "access plus 1 year"
-  ExpiresByType font/woff2 "access plus 1 year"
-  ExpiresByType font/otf "access plus 1 year"
-  
-  # Default cache
-  ExpiresDefault "access plus 2 days"
+
+  # HTML — short cache (always fresh)
+  ExpiresByType text/html                         "access plus 1 hour"
+
+  # CSS & JavaScript — long cache (content hash in filename)
+  ExpiresByType text/css                          "access plus 1 year"
+  ExpiresByType application/javascript            "access plus 1 year"
+  ExpiresByType text/javascript                   "access plus 1 year"
+  ExpiresByType application/x-javascript         "access plus 1 year"
+
+  # Images — long cache
+  ExpiresByType image/jpeg                        "access plus 1 year"
+  ExpiresByType image/png                         "access plus 1 year"
+  ExpiresByType image/gif                         "access plus 1 year"
+  ExpiresByType image/webp                        "access plus 1 year"
+  ExpiresByType image/svg+xml                     "access plus 1 year"
+  ExpiresByType image/x-icon                      "access plus 1 year"
+
+  # Fonts — very long cache
+  ExpiresByType font/ttf                          "access plus 1 year"
+  ExpiresByType font/woff                         "access plus 1 year"
+  ExpiresByType font/woff2                        "access plus 1 year"
+  ExpiresByType application/font-woff             "access plus 1 year"
+
+  # JSON/XML data
+  ExpiresByType application/json                  "access plus 1 day"
+  ExpiresByType application/xml                   "access plus 1 day"
 </IfModule>
 
-# 4. Prevent Caching of HTML Files (React Entry Point)
-<FilesMatch "\.(html|htm)$">
-  <IfModule mod_headers.c>
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
-    Header set Pragma "no-cache"
-    Header set Expires 0
-  </IfModule>
-</FilesMatch>
+# ── 4. Cache-Control Headers ─────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  # Hashed assets (JS/CSS with hash in filename) — cache 1 year immutably
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # Images — cache 1 year
+  <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|ico)$">
+    Header set Cache-Control "public, max-age=31536000"
+  </FilesMatch>
+
+  # Fonts — cache 1 year
+  <FilesMatch "\.(woff|woff2|ttf|eot)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # HTML — always revalidate
+  <FilesMatch "\.html$">
+    Header set Cache-Control "public, max-age=3600, must-revalidate"
+  </FilesMatch>
+
+  # Security headers (bonus)
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ── 5. Remove ETags (prevents double validation requests) ────────────────────
+<IfModule mod_headers.c>
+  Header unset ETag
+</IfModule>
+FileETag None
+
+# ── 6. Prevent directory listing ─────────────────────────────────────────────
+Options -Indexes
+
+# ── 7. Serve pre-compressed .gz files if available ───────────────────────────
+<IfModule mod_rewrite.c>
+  RewriteCond %{HTTP:Accept-Encoding} gzip
+  RewriteCond %{REQUEST_FILENAME}.gz -f
+  RewriteRule ^(.*)$ $1.gz [QSA,L]
+</IfModule>
