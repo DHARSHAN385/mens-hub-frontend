@@ -21,6 +21,34 @@
       <link rel="preconnect" href="https://wsrv.nl" crossorigin />
       <link rel="dns-prefetch" href="https://images.unsplash.com" />
 
+      <!-- Instant inline LCP image preloader: parses cached banner from localStorage to fetch the correct active banner URL instantly before React boots -->
+      <script>
+        (function() {
+          try {
+            var cached = localStorage.getItem('cachedBanner');
+            var desktopUrl = "https://menshub64.in/media/uploads/1780328897_WhatsApp_Image_2026-05-31_at_8.01.01_PM_1.jpeg";
+            var mobileUrl = "https://menshub64.in/media/uploads/1780333205_WhatsApp_Image_2026-05-31_at_8.01.01_PM.jpeg";
+            if (cached) {
+              var config = JSON.parse(cached);
+              if (config.desktop_url) desktopUrl = config.desktop_url;
+              if (config.mobile_url) mobileUrl = config.mobile_url;
+            }
+            var isMobile = window.innerWidth < 768;
+            var activeImg = isMobile ? mobileUrl : desktopUrl;
+            var width = isMobile ? 600 : 1200;
+            var optimizedUrl = "https://wsrv.nl/?url=" + encodeURIComponent(activeImg) + "&w=" + width + "&q=75&output=webp";
+            
+            var link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'image';
+            link.href = optimizedUrl;
+            link.type = 'image/webp';
+            link.setAttribute('fetchpriority', 'high');
+            document.head.appendChild(link);
+          } catch(e) {}
+        })();
+      </script>
+
 
 
       <!-- Preconnect for Google Fonts if used -->
