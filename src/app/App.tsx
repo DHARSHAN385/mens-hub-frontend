@@ -831,20 +831,6 @@ export default function App(): React.ReactElement {
       try { parsedCategories = JSON.parse(cachedCategories); } catch {}
     }
     
-    // Check if the cached products/categories are the default seeds to prevent flash
-    const containsSeedData = 
-      parsedProducts.some((p: any) => p && typeof p.name === 'string' && DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())) ||
-      parsedCategories.some((c: any) => c && typeof c.name === 'string' && DEFAULT_SEED_CATEGORY_NAMES.includes(c.name.toLowerCase()));
-      
-    if (containsSeedData) {
-      console.log("🧹 Wiping default seeded cache from localStorage to prevent flash...");
-      localStorage.removeItem('cachedProducts');
-      localStorage.removeItem('cachedCategories');
-      localStorage.removeItem('cachedBanner');
-      parsedProducts = [];
-      parsedCategories = [];
-    }
-    
     let hasCache = false;
     if (parsedProducts && parsedProducts.length > 0) {
       setProducts(parsedProducts);
@@ -854,11 +840,8 @@ export default function App(): React.ReactElement {
       setCategories(parsedCategories);
       hasCache = true;
     }
-    if (cachedBanner && !containsSeedData) {
-      const sanitizedCachedBanner = cachedBanner.includes('photo-1578921049066-f845f67c53e8')
-        ? (CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200')
-        : cachedBanner;
-      setBannerImg(sanitizedCachedBanner);
+    if (cachedBanner) {
+      setBannerImg(cachedBanner);
     }
     
     if (hasCache) {
@@ -878,26 +861,14 @@ export default function App(): React.ReactElement {
         const freshCategories = dbCategories || [];
         const freshBanner = dbBanner || "";
         
-        // Safety check to filter out any default seed data from arriving products/categories
-        const filteredProducts = freshProducts.filter((p: any) => 
-          p && typeof p.name === 'string' && !DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())
-        );
-        const filteredCategories = freshCategories.filter((c: any) => 
-          c && typeof c.name === 'string' && !DEFAULT_SEED_CATEGORY_NAMES.includes(c.name.toLowerCase())
-        );
+        setProducts(freshProducts);
+        localStorage.setItem('cachedProducts', JSON.stringify(freshProducts));
         
-        setProducts(filteredProducts);
-        localStorage.setItem('cachedProducts', JSON.stringify(filteredProducts));
+        setCategories(freshCategories);
+        localStorage.setItem('cachedCategories', JSON.stringify(freshCategories));
         
-        setCategories(filteredCategories);
-        localStorage.setItem('cachedCategories', JSON.stringify(filteredCategories));
-        
-        const sanitizedBanner = freshBanner.includes('photo-1578921049066-f845f67c53e8')
-          ? (CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200')
-          : freshBanner;
-        
-        setBannerImg(sanitizedBanner);
-        localStorage.setItem('cachedBanner', sanitizedBanner);
+        setBannerImg(freshBanner);
+        localStorage.setItem('cachedBanner', freshBanner);
       } catch (err) {
         console.warn("Could not load data from database:", err);
       } finally {
@@ -1010,28 +981,16 @@ export default function App(): React.ReactElement {
       const freshCategories = dbCategories || [];
       const freshBanner = dbBanner || "";
       
-      // Filter out seed products and categories to ensure a completely custom experience
-      const filteredProducts = freshProducts.filter((p: any) => 
-        p && typeof p.name === 'string' && !DEFAULT_SEED_PRODUCT_NAMES.includes(p.name.toLowerCase())
-      );
-      const filteredCategories = freshCategories.filter((c: any) => 
-        c && typeof c.name === 'string' && !DEFAULT_SEED_CATEGORY_NAMES.includes(c.name.toLowerCase())
-      );
-      
-      setProducts(filteredProducts);
-      localStorage.setItem('cachedProducts', JSON.stringify(filteredProducts));
+      setProducts(freshProducts);
+      localStorage.setItem('cachedProducts', JSON.stringify(freshProducts));
       console.log('✅ Products refreshed from DB');
       
-      setCategories(filteredCategories);
-      localStorage.setItem('cachedCategories', JSON.stringify(filteredCategories));
+      setCategories(freshCategories);
+      localStorage.setItem('cachedCategories', JSON.stringify(freshCategories));
       console.log('✅ Categories refreshed from DB');
       
-      const sanitizedBanner = freshBanner.includes('photo-1578921049066-f845f67c53e8')
-        ? (CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200')
-        : freshBanner;
-      
-      setBannerImg(sanitizedBanner);
-      localStorage.setItem('cachedBanner', sanitizedBanner);
+      setBannerImg(freshBanner);
+      localStorage.setItem('cachedBanner', freshBanner);
       console.log('✅ Banner refreshed from DB');
     } catch (err) {
       console.warn("Could not refresh data from database:", err);
