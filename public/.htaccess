@@ -1,9 +1,9 @@
 # ========================================================
-# Mens Hub — High Performance .htaccess for Hostinger
-# Fixes: Caching, Gzip, SPA routing, Security headers
+# Mens Hub — Simplified High Performance .htaccess
+# Optimized for LiteSpeed & Apache response times
 # ========================================================
 
-# ── 1. SPA Routing (React Router — prevents 404 on refresh) ────────────────
+# 1. SPA Routing (React Router)
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
@@ -13,95 +13,30 @@
   RewriteRule . /index.html [L]
 </IfModule>
 
-# ── 2. Gzip / Brotli Compression (reduces file sizes by 70%) ───────────────
+# 2. Gzip Compression
 <IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html
-  AddOutputFilterByType DEFLATE text/css
-  AddOutputFilterByType DEFLATE text/javascript
-  AddOutputFilterByType DEFLATE application/javascript
-  AddOutputFilterByType DEFLATE application/x-javascript
-  AddOutputFilterByType DEFLATE application/json
-  AddOutputFilterByType DEFLATE application/xml
-  AddOutputFilterByType DEFLATE image/svg+xml
-  AddOutputFilterByType DEFLATE text/plain
-  AddOutputFilterByType DEFLATE text/xml
-  AddOutputFilterByType DEFLATE font/ttf
-  AddOutputFilterByType DEFLATE font/woff
-  AddOutputFilterByType DEFLATE font/woff2
+  AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>
 
-# ── 3. Browser Caching (fixes "Use efficient cache lifetimes" warning) ──────
-<IfModule mod_expires.c>
-  ExpiresActive On
-
-  # HTML — short cache (always fresh)
-  ExpiresByType text/html                         "access plus 1 hour"
-
-  # CSS & JavaScript — long cache (content hash in filename)
-  ExpiresByType text/css                          "access plus 1 year"
-  ExpiresByType application/javascript            "access plus 1 year"
-  ExpiresByType text/javascript                   "access plus 1 year"
-  ExpiresByType application/x-javascript         "access plus 1 year"
-
-  # Images — long cache
-  ExpiresByType image/jpeg                        "access plus 1 year"
-  ExpiresByType image/png                         "access plus 1 year"
-  ExpiresByType image/gif                         "access plus 1 year"
-  ExpiresByType image/webp                        "access plus 1 year"
-  ExpiresByType image/svg+xml                     "access plus 1 year"
-  ExpiresByType image/x-icon                      "access plus 1 year"
-
-  # Fonts — very long cache
-  ExpiresByType font/ttf                          "access plus 1 year"
-  ExpiresByType font/woff                         "access plus 1 year"
-  ExpiresByType font/woff2                        "access plus 1 year"
-  ExpiresByType application/font-woff             "access plus 1 year"
-
-  # JSON/XML data
-  ExpiresByType application/json                  "access plus 1 day"
-  ExpiresByType application/xml                   "access plus 1 day"
-</IfModule>
-
-# ── 4. Cache-Control Headers ─────────────────────────────────────────────────
+# 3. Simple & Fast Cache-Control Headers (No dynamic Expires calculations)
 <IfModule mod_headers.c>
-  # Hashed assets (JS/CSS with hash in filename) — cache 1 year immutably
-  <FilesMatch "\.(js|css)$">
+  # 1 year cache for static assets (hashed JS/CSS/Fonts)
+  <FilesMatch "\.(js|css|woff|woff2|ttf)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
 
-  # Images — cache 1 year
+  # 1 month cache for images
   <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|ico)$">
-    Header set Cache-Control "public, max-age=31536000"
+    Header set Cache-Control "public, max-age=2592000"
   </FilesMatch>
 
-  # Fonts — cache 1 year
-  <FilesMatch "\.(woff|woff2|ttf|eot)$">
-    Header set Cache-Control "public, max-age=31536000, immutable"
-  </FilesMatch>
-
-  # HTML — always revalidate
+  # Always revalidate index.html (never serve stale index.html)
   <FilesMatch "\.html$">
-    Header set Cache-Control "public, max-age=3600, must-revalidate"
+    Header set Cache-Control "public, max-age=0, must-revalidate"
   </FilesMatch>
 
-  # Security headers (bonus)
+  # Security headers
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-XSS-Protection "1; mode=block"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
-</IfModule>
-
-# ── 5. Remove ETags (prevents double validation requests) ────────────────────
-<IfModule mod_headers.c>
-  Header unset ETag
-</IfModule>
-FileETag None
-
-# ── 6. Prevent directory listing ─────────────────────────────────────────────
-Options -Indexes
-
-# ── 7. Serve pre-compressed .gz files if available ───────────────────────────
-<IfModule mod_rewrite.c>
-  RewriteCond %{HTTP:Accept-Encoding} gzip
-  RewriteCond %{REQUEST_FILENAME}.gz -f
-  RewriteRule ^(.*)$ $1.gz [QSA,L]
 </IfModule>
