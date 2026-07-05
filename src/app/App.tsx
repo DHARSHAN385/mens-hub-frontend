@@ -1690,7 +1690,9 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                       transform: `scale(${config.desktop_zoom / 100})`,
                       transformOrigin: `${config.desktop_x}% ${config.desktop_y}%`
                     }}
-                    alt="Desktop Banner" 
+                    alt="Mens Hub Hero Banner" 
+                    width="1200"
+                    height="384"
                     fetchPriority="high"
                     decoding="async"
                     onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackBanner, 1200); }} 
@@ -1707,7 +1709,9 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                       transform: `scale(${config.mobile_zoom / 100})`,
                       transformOrigin: `${config.mobile_x}% ${config.mobile_y}%`
                     }}
-                    alt="Mobile Banner" 
+                    alt="Mens Hub Hero Banner" 
+                    width="600"
+                    height="256"
                     fetchPriority="high"
                     decoding="async"
                     onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackBanner, 600); }} 
