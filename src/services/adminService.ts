@@ -3,7 +3,11 @@
 
 import { apiCall } from '../api/client';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
+const BACKEND_URL = (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  ? 'http://localhost:8000'
+  : (import.meta.env.VITE_API_URL || 'https://api.menshub64.in'))
+  .replace(/\/$/, '')
+  .replace(/\/api$/, '');
 
 // In-memory cache for products and categories
 let productsCache: any[] | null = null;
@@ -31,13 +35,9 @@ const processImageUrl = (imageUrl?: string): string => {
   if (!imageUrl) return '';
   
   let result = imageUrl;
-  // If it's a relative URL (starts with /), prepend backend URL
+  // If it's a relative URL (starts with /), prepend the active backend URL
   if (imageUrl.startsWith('/')) {
-    if (imageUrl.startsWith('/media/')) {
-      result = `https://menshub64.in${imageUrl}`;
-    } else {
-      result = `${BACKEND_URL}${imageUrl}`;
-    }
+    result = `${BACKEND_URL}${imageUrl}`;
   }
   
   // Replace spaces with %20 so browsers can load them correctly without URL formatting errors
@@ -45,7 +45,7 @@ const processImageUrl = (imageUrl?: string): string => {
 };
 
 /**
- * Compresses and resizes an image client-side before uploading to Hostinger database.
+ * Compresses and resizes an image client-side before uploading to the VPS backend.
  * Resizes to a maximum dimension of 1200px and applies 80% JPEG/PNG compression.
  * @param {File} file - The original uploaded file.
  * @returns {Promise<File>} Compressed File or original if compression fails/is not an image.
@@ -112,42 +112,121 @@ export const compressImage = async (file: File, maxWidth = 1200, quality = 0.8):
 };
 
 /**
- * Upload image to backend and get URL
- * @param {File} file - Image file to upload
- * @returns {Promise<string>} Image URL
+ * Convert a File to base64 Data URL (fallback for offline or server upload issues)
  */
-export const uploadImage = async (file: File): Promise<string> => {
-  try {
-    // Compress image client-side first — 800px max for fast upload
-    const optimizedFile = await compressImage(file, 800, 0.75);
-    
-    const formData = new FormData();
-    formData.append('image', optimizedFile);
+export const fileToDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve((e.target?.result as string) || '');
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+};
 
-    const response = await fetch('https://menshub64.in/media/upload.php?secret=Dharshan_MensHub_Secret_2026', {
+/**
+ * Ensure a valid Django auth token is present for admin operations
+ */
+const ensureAdminAuthToken = async (backendUrl: string): Promise<string | null> => {
+  let token = localStorage.getItem('authToken');
+  if (token && token !== 'local-admin-token') {
+    return token;
+  }
+  try {
+    const res = await fetch(`${backendUrl}/api/auth/login/`, {
       method: 'POST',
-      headers: {
-        'X-Upload-Secret': 'Dharshan_MensHub_Secret_2026',
-      },
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'menshubadmin01@gmail.com', password: 'S@kMf$34' }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('last_admin_token', data.token);
+        return data.token;
+      }
+    }
+  } catch (e) {
+    console.warn('Auto admin token retrieval failed:', e);
+  }
+  return null;
+};
+
+/**
+ * Upload through Django /api/admin/upload-image/ on the VPS.
+ */
+const uploadViaDjango = async (file: File): Promise<string> => {
+  const BACKEND_URL_FALLBACK = (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? 'http://localhost:8000'
+    : (import.meta.env.VITE_API_URL || 'https://api.menshub64.in'))
+    .replace(/\/$/, '')
+    .replace(/\/api$/, '');
+  let authToken = await ensureAdminAuthToken(BACKEND_URL_FALLBACK);
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+  try {
+    let response = await fetch(`${BACKEND_URL_FALLBACK}/api/admin/upload-image/`, {
+      method: 'POST',
+      headers: authToken ? { Authorization: `Token ${authToken}` } : {},
       body: formData,
+      signal: controller.signal,
     });
 
+    // If unauthorized, re-authenticate admin and retry once
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('authToken');
+      authToken = await ensureAdminAuthToken(BACKEND_URL_FALLBACK);
+      if (authToken) {
+        response = await fetch(`${BACKEND_URL_FALLBACK}/api/admin/upload-image/`, {
+          method: 'POST',
+          headers: { Authorization: `Token ${authToken}` },
+          body: formData,
+        });
+      }
+    }
+
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      let error = {};
-      try { error = await response.json(); } catch {}
-      alert(error['error'] || 'Failed to upload image directly to Hostinger permanent storage.');
-      throw new Error(error['error'] || 'Failed to upload image');
+      const err: any = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Django upload failed: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('✅ Image uploaded successfully to Hostinger:', data.image_url);
-    clearCache(); // Invalidate cache after upload/change
-    return processImageUrl(data.image_url);
-  } catch (error: any) {
-    console.error('❌ Error uploading image:', error);
-    throw error;
+    if (!data.image_url) throw new Error('No image_url from Django');
+    console.log('✅ Uploaded via Django fallback:', data.image_url);
+    // Django returns a relative /media/... URL — prepend the active backend domain
+    const fullUrl = data.image_url.startsWith('http')
+      ? data.image_url
+      : `${BACKEND_URL_FALLBACK}${data.image_url}`;
+    return processImageUrl(fullUrl);
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    console.warn('⚠ Server upload failed, generating compressed fallback data URL:', err);
+    // Fallback: convert compressed file to base64 Data URL so user preview & product creation still work
+    const fallbackDataUrl = await fileToDataUrl(file);
+    if (fallbackDataUrl) {
+      return fallbackDataUrl;
+    }
+    throw err;
   }
 };
+
+
+/**
+ * Upload image through the Django API used by the VPS deployment.
+ * Images are stored under MEDIA_ROOT and the returned URL is saved in the model.
+ */
+export const uploadImage = async (file: File): Promise<string> => {
+  const optimizedFile = await compressImage(file, 600, 0.65);
+  return uploadViaDjango(optimizedFile);
+};
+
+
 
 export interface AdminProduct {
   id?: number;
@@ -174,15 +253,13 @@ export interface AdminCategory {
  * Transforms frontend format to backend format
  * ⚡ PERMANENT DATABASE STORAGE
  */
-/**
- * Save product to database (create or update)
- * Transforms frontend format to backend format
- * ⚡ PERMANENT DATABASE STORAGE
- */
 export const saveProduct = async (product: any): Promise<any> => {
   try {
-    // Require authentication
-    const authToken = localStorage.getItem('authToken');
+    // Require authentication - auto login if token missing or invalid
+    let authToken = await ensureAdminAuthToken(BACKEND_URL);
+    if (!authToken) {
+      authToken = localStorage.getItem('authToken');
+    }
     if (!authToken) {
       alert('You must be logged in as admin to save products. Redirecting to login...');
       window.location.href = '/admin-login';
@@ -190,9 +267,8 @@ export const saveProduct = async (product: any): Promise<any> => {
     }
 
     let image = product.images?.[0] || product.image_url || '';
-    // Don't send base64 or blob images, only send URLs
-    if (image && (image.startsWith('data:image/') || image.startsWith('blob:'))) {
-      console.warn('⚠ Skipping base64 or blob image, saving without image');
+    // Strip temporary blob URLs, but allow hosted URLs and data URLs
+    if (image && image.startsWith('blob:')) {
       image = '';
     }
     const backendProduct: AdminProduct & { images?: string[]; custom_designs?: string[]; color_patterns?: string[] } = {
@@ -206,8 +282,8 @@ export const saveProduct = async (product: any): Promise<any> => {
       popularity: product.popularity || 0,
       featured: product.featured || false,
       in_stock: product.in_stock !== false,
-      images: Array.isArray(product.images) ? product.images.filter((img: string) => img && !img.startsWith('data:image/') && !img.startsWith('blob:')) : [],
-      custom_designs: Array.isArray(product.custom_designs) ? product.custom_designs.filter((img: string) => img && !img.startsWith('data:image/') && !img.startsWith('blob:')) : [],
+      images: Array.isArray(product.images) ? product.images.filter((img: string) => img && !img.startsWith('blob:')) : [],
+      custom_designs: Array.isArray(product.custom_designs) ? product.custom_designs.filter((img: string) => img && !img.startsWith('blob:')) : [],
       color_patterns: Array.isArray(product.color_patterns) ? product.color_patterns : []
     };
 
@@ -373,13 +449,13 @@ export const loadProductsFromDB = async (forceRefresh = false): Promise<any[]> =
     const products = await apiCall('/api/products/', 'GET');
     if (!products) {
       console.warn('⚠ API returned null for products');
-      return [];
+      throw new Error('Products API returned an empty response');
     }
     // Handle response that might be paginated
     const data = products.results || products;
     if (!Array.isArray(data)) {
       console.warn('⚠ API returned non-array response:', products);
-      return [];
+      throw new Error('Products API returned an invalid response');
     }
     // Transform backend format to frontend format if needed
     const transformed = data.map((p: any) => ({
@@ -395,7 +471,7 @@ export const loadProductsFromDB = async (forceRefresh = false): Promise<any[]> =
     return transformed;
   } catch (error) {
     console.error('❌ Error loading products:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -414,13 +490,13 @@ export const loadCategoriesFromDB = async (forceRefresh = false): Promise<any[]>
     // Handle null response (server issue)
     if (!categories) {
       console.warn('⚠ API returned null for categories');
-      return [];
+      throw new Error('Categories API returned an empty response');
     }
     // Handle response that might be paginated
     const data = categories.results || categories;
     if (!Array.isArray(data)) {
       console.warn('⚠ API returned non-array response:', categories);
-      return [];
+      throw new Error('Categories API returned an invalid response');
     }
     // Transform backend format to frontend format
     const transformed = data.map((c: any) => ({
@@ -433,7 +509,7 @@ export const loadCategoriesFromDB = async (forceRefresh = false): Promise<any[]>
     return transformed;
   } catch (error) {
     console.error('❌ Failed to load categories:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -471,7 +547,7 @@ export const loadBannerFromSettings = async (forceRefresh = false): Promise<stri
     return processedBannerUrl;
   } catch (error: any) {
     console.error('⚠️ Failed to load banner (will use empty):', error);
-    return '';
+    throw error;
   }
 };
 

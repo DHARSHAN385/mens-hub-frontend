@@ -2,7 +2,20 @@
 // This file handles all communication with the Django backend
 
 // Base URL for all API requests
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    return 'http://localhost:8000';
+  }
+
+  const configuredUrl = import.meta.env.VITE_API_URL;
+  if (configuredUrl && configuredUrl.trim()) {
+    return configuredUrl.replace(/\/$/, '').replace(/\/api$/, '');
+  }
+
+  return 'https://api.menshub64.in';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Get authentication token from localStorage
 const getAuthToken = (): string | null => {
@@ -33,11 +46,17 @@ const getHeaders = () => {
  * @returns {Promise} Response from API
  */
 export const apiCall = async (endpoint: string, method = 'GET', data: any = null) => {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const apiEndpoint = endpoint.startsWith('/api/') ? endpoint : `/api${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const url = `${API_BASE_URL}${apiEndpoint}`;
+
+  // ⏱ Abort after 15 seconds to prevent infinite loading
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
   
   const options: RequestInit = {
     method,
     headers: getHeaders(),
+    signal: controller.signal,
   };
 
   // Add body for POST and PUT requests
@@ -47,6 +66,7 @@ export const apiCall = async (endpoint: string, method = 'GET', data: any = null
 
   try {
     const response = await fetch(url, options);
+    clearTimeout(timeoutId);
 
     // Handle errors
     if (!response.ok) {
@@ -54,6 +74,8 @@ export const apiCall = async (endpoint: string, method = 'GET', data: any = null
         console.warn('🔑 Auth token invalid or expired. Clearing session...');
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
+        localStorage.removeItem('userEmail');
+        window.dispatchEvent(new CustomEvent('auth:invalid'));
         // We don't reload here to avoid infinite loops, but the next calls will succeed as Guest
       }
       
@@ -75,7 +97,7 @@ export const apiCall = async (endpoint: string, method = 'GET', data: any = null
       } catch {
         // If we can't parse error response, use status code
       }
-      console.error(`❌ [${method} ${endpoint}] ${errorMessage}`, fullError);
+      console.error(`❌ [${method} ${apiEndpoint}] ${errorMessage}`, fullError);
       throw new Error(errorMessage);
     }
 
@@ -85,7 +107,7 @@ export const apiCall = async (endpoint: string, method = 'GET', data: any = null
     
     // For DELETE requests, no content is expected
     if (method === 'DELETE') {
-      console.log(`✓ [${method} ${endpoint}] Deleted successfully`);
+      console.log(`✓ [${method} ${apiEndpoint}] Deleted successfully`);
       return { success: true };
     }
 
@@ -93,21 +115,26 @@ export const apiCall = async (endpoint: string, method = 'GET', data: any = null
     const responseText = await response.text();
     
     if (!responseText) {
-      console.warn(`⚠ [${method} ${endpoint}] Empty response body`);
+      console.warn(`⚠ [${method} ${apiEndpoint}] Empty response body`);
       return null;
     }
 
     // Parse and return JSON
     try {
       const parsed = JSON.parse(responseText);
-      console.log(`✓ [${method} ${endpoint}] Success`, parsed);
+      console.log(`✓ [${method} ${apiEndpoint}] Success`, parsed);
       return parsed;
     } catch (parseError) {
-      console.error(`❌ [${method} ${endpoint}] Failed to parse JSON:`, responseText.substring(0, 200));
+      console.error(`❌ [${method} ${apiEndpoint}] Failed to parse JSON:`, responseText.substring(0, 200));
       throw new Error('Invalid JSON response from API');
     }
-  } catch (error) {
-    console.error(`API Error [${method} ${endpoint}]:`, error);
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error?.name === 'AbortError') {
+      console.error(`⏱ [${method} ${apiEndpoint}] Request timed out after 15 seconds`);
+      throw new Error('Request timed out. Server may be starting up — please try again in a moment.');
+    }
+    console.error(`API Error [${method} ${apiEndpoint}]:`, error);
     throw error;
   }
 };

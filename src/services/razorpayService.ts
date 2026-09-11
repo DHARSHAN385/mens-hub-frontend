@@ -20,7 +20,63 @@ interface PaymentVerification {
   razorpaySignature: string;
 }
 
+interface RazorpayCheckoutOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  handler: (response: any) => void | Promise<void>;
+  prefill?: { name?: string; email?: string; contact?: string };
+  theme?: { color?: string };
+  modal?: { ondismiss?: () => void };
+}
+
 export class RazorpayService {
+  private checkoutScriptPromise: Promise<void> | null = null;
+
+  private loadCheckoutScript(): Promise<void> {
+    if (typeof window === 'undefined') {
+      return Promise.reject(new Error('Razorpay can only be loaded in browser'));
+    }
+
+    if ((window as any).Razorpay) {
+      return Promise.resolve();
+    }
+
+    if (!this.checkoutScriptPromise) {
+      const preconnect = document.createElement('link');
+      preconnect.rel = 'preconnect';
+      preconnect.href = 'https://checkout.razorpay.com';
+      preconnect.crossOrigin = 'anonymous';
+      document.head.appendChild(preconnect);
+
+      this.checkoutScriptPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Razorpay checkout script'));
+        document.head.appendChild(script);
+      });
+    }
+
+    return this.checkoutScriptPromise;
+  }
+
+  async openCheckout(options: RazorpayCheckoutOptions): Promise<any> {
+    await this.loadCheckoutScript();
+
+    if (!(window as any).Razorpay) {
+      throw new Error('Razorpay SDK is unavailable');
+    }
+
+    const rzp = new (window as any).Razorpay(options);
+    rzp.open();
+    return rzp;
+  }
+
   /**
    * Initiate payment order with backend
    */

@@ -13,3 +13,5 @@ cypress/videos/
 cypress/screenshots/
 menshum_productpics/
 db.sqlite3
+
+.vercel

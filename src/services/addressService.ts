@@ -1,6 +1,6 @@
 // Address service for managing user addresses
 
-const BASE_API_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com/api';
+const BASE_API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in/api';
 const API_URL = BASE_API_URL.endsWith('/api') ? BASE_API_URL : `${BASE_API_URL}/api`;
 
 export interface Address {

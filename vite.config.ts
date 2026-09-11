@@ -15,11 +15,25 @@ function figmaAssetResolver() {
   }
 }
 
+function nonBlockingStylesheet() {
+  return {
+    name: 'non-blocking-stylesheet',
+    transformIndexHtml(html) {
+      return html.replace(
+        /<link rel="stylesheet" crossorigin href="([^"]+\.css)">/g,
+        '<link rel="preload" as="style" href="$1" crossorigin onload="this.onload=null;this.rel=\'stylesheet\'">' +
+          '<noscript><link rel="stylesheet" href="$1" crossorigin></noscript>'
+      )
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     figmaAssetResolver(),
     react(),
     tailwindcss(),
+    nonBlockingStylesheet(),
   ],
   resolve: {
     alias: {
@@ -28,12 +42,15 @@ export default defineConfig({
   },
 
   build: {
-    // Target modern browsers — removes legacy polyfills, shrinks bundle size
-    target: 'es2020',
-    // Enable CSS code splitting
-    cssCodeSplit: true,
+    // Target only modern browsers to keep the bundle smaller and remove legacy polyfills
+    target: 'es2022',
+    // Keep CSS in one bundle so the browser does not wait on multiple CSS fetches during first paint
+    cssCodeSplit: false,
     // Reduce chunk size warnings threshold
     chunkSizeWarningLimit: 600,
+    modulePreload: {
+      polyfill: false,
+    },
     rollupOptions: {
       output: {
         // Aggressive manual chunking — splits bundle into small on-demand pieces

@@ -196,7 +196,7 @@ export const AdminOrderNotificationCenter: React.FC<AdminNotificationProps> = ({
     try {
       const token = localStorage.getItem('authToken') || localStorage.getItem('token');
       if (token) {
-        const apiURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+        const apiURL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
         await fetch(`${apiURL}/api/order-notifications/${notificationId}/dismiss/`, {
           method: 'POST',
           headers: {

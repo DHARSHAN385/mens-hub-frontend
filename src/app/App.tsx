@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
+import { createPortal } from "react-dom";
 import { CONFIG } from "./config";
 import { cartService } from "../services/cartService";
 import { wishlistService } from "../services/wishlistService";
-import { razorpayService } from "../services/razorpayService";
 
 // Sync temporary localStorage cart/wishlist to permanent DB storage when user logs in
 async function migrateLocalToDB() {
@@ -28,13 +28,55 @@ async function migrateLocalToDB() {
     }
   }
 }
-import { Toaster, toast } from "sonner";
 import logoImg from "../imports/image-11.png";
 import adminService from "../services/adminService";
+
+type ToastType = 'success' | 'error' | 'info' | 'warning';
+type ToastEvent = { message: string; type: ToastType };
+
+const toast = {
+  success: (message: string) => window.dispatchEvent(new CustomEvent<ToastEvent>('app:toast', { detail: { message, type: 'success' } })),
+  error: (message: string) => window.dispatchEvent(new CustomEvent<ToastEvent>('app:toast', { detail: { message, type: 'error' } })),
+  info: (message: string) => window.dispatchEvent(new CustomEvent<ToastEvent>('app:toast', { detail: { message, type: 'info' } })),
+  warning: (message: string) => window.dispatchEvent(new CustomEvent<ToastEvent>('app:toast', { detail: { message, type: 'warning' } })),
+};
+
+function ToastHost() {
+  const [current, setCurrent] = useState<ToastEvent | null>(null);
+
+  useEffect(() => {
+    const showToast = (event: Event) => setCurrent((event as CustomEvent<ToastEvent>).detail);
+    window.addEventListener('app:toast', showToast);
+    return () => window.removeEventListener('app:toast', showToast);
+  }, []);
+
+  useEffect(() => {
+    if (!current) return;
+    const timer = window.setTimeout(() => setCurrent(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [current]);
+
+  if (!current) return null;
+
+  const tone = current.type === 'error'
+    ? 'bg-red-600'
+    : current.type === 'warning'
+      ? 'bg-amber-600'
+      : current.type === 'success'
+        ? 'bg-emerald-600'
+        : 'bg-neutral-800';
+
+  return (
+    <div className={`fixed right-4 top-4 z-[10000] max-w-[min(90vw,24rem)] rounded-lg px-4 py-3 text-sm font-medium text-white shadow-xl ${tone}`} role="status">
+      {current.message}
+    </div>
+  );
+}
 
 // Lazy-load heavy components — NOT needed for initial paint
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const Policies = lazy(() => import("./pages/Policies"));
+const GoogleAuthProvider = lazy(() => import("../components/GoogleAuthProvider").then(m => ({ default: m.GoogleAuthProvider })));
 const GoogleLogin = lazy(() => import("../components/GoogleLogin").then(m => ({ default: m.GoogleLogin })));
 const AuthForm = lazy(() => import("../components/AuthForm").then(m => ({ default: m.AuthForm })));
 const AdminOrderNotificationCenter = lazy(() => import("../components/AdminOrderNotificationCenter").then(m => ({ default: m.AdminOrderNotificationCenter })));
@@ -80,7 +122,12 @@ export interface BannerConfig {
   mobile_y: number;
 }
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
+const LOCAL_HERO = '/hero/hero-desktop.webp';
+
+function scheduleAfterFirstPaint(callback: () => void): void {
+  window.setTimeout(callback, 1500);
+}
 
 function absoluteUrl(url?: string): string {
   if (!url) return '';
@@ -88,7 +135,7 @@ function absoluteUrl(url?: string): string {
   if (url.startsWith('/')) {
     if (url.startsWith('/media/')) {
       result = `https://menshub64.in${url}`;
-    } else {
+    } else if (url.startsWith('/api/')) {
       result = `${BACKEND_URL}${url}`;
     }
   }
@@ -98,10 +145,15 @@ function absoluteUrl(url?: string): string {
 export function optimizeImageUrl(url: string, width: number): string {
   if (!url) return '';
   let result = absoluteUrl(url);
+
+  // Keep the active desktop hero on the same origin and serve the compressed build asset.
+  if (result.includes('1788749222825_WhatsApp%20Image%202026-05-27%20at%203.01.50%20PM.jpg')) {
+    return '/hero/hero-desktop.webp';
+  }
   
   // Intercept the known 404 seed banner URL and use a valid fallback instead
   if (result.includes('photo-1578921049066-f845f67c53e8')) {
-    result = CONFIG.FALLBACK_BANNER || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200';
+    result = CONFIG.FALLBACK_BANNER || LOCAL_HERO;
   }
 
   // Optimize Unsplash images natively via their query parameters
@@ -127,14 +179,34 @@ export function optimizeImageUrl(url: string, width: number): string {
     }
   }
 
-  // For any other public web URLs (like backend uploads, WhatsApp images, Hostinger uploads), proxy through wsrv.nl to resize, crop, and convert to lightweight WebP format
+  // Serve VPS media directly; avoid another network hop for private or encoded filenames.
+  if (result.includes('menshub64.in/media/')) {
+    return result;
+  }
+
+  // For all other public image URLs, keep the direct asset and apply a lightweight format hint.
+  // Avoiding wsrv.nl removes an extra network dependency and reduces first-paint latency.
   if (result.startsWith('http://') || result.startsWith('https://')) {
-    if (result.includes('wsrv.nl')) return result; // avoid double proxying
-    const encoded = encodeURIComponent(result);
-    return `https://wsrv.nl/?url=${encoded}&w=${width}&q=75&output=webp`;
+    if (result.includes('wsrv.nl')) return result;
+    try {
+      const urlObj = new URL(result);
+      urlObj.searchParams.set('w', width.toString());
+      urlObj.searchParams.set('q', '60');
+      urlObj.searchParams.set('auto', 'format');
+      return urlObj.toString();
+    } catch (e) {
+      return result;
+    }
   }
 
   return result;
+}
+
+export function buildResponsiveSrcSet(url: string, widths: number[]): string {
+  if (!url) return '';
+  return widths
+    .map((width) => `${optimizeImageUrl(url, width)} ${width}w`)
+    .join(', ');
 }
 
 export function getColorHex(c: string): string {
@@ -696,9 +768,6 @@ const INITIAL_CATEGORIES: Category[] = [
   }
 ];
 
-const INITIAL_BANNER = '{"desktop_url":"https://menshub64.in/media/uploads/1780328897_WhatsApp_Image_2026-05-31_at_8.01.01_PM_1.jpeg","mobile_url":"https://menshub64.in/media/uploads/1780333205_WhatsApp_Image_2026-05-31_at_8.01.01_PM.jpeg","desktop_zoom":105,"desktop_x":50,"desktop_y":15,"mobile_zoom":110,"mobile_x":0,"mobile_y":3}';
-
-
 /* ═══════════════════════════════════════════════
    APP ROOT
 ═══════════════════════════════════════════════ */
@@ -762,6 +831,18 @@ export default function App(): React.ReactElement {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  useEffect(() => {
+    const handleInvalidAuth = () => {
+      setUser(null);
+      setMigrationDone(false);
+      if (page.name === 'admin') {
+        navigate({ name: 'login' });
+      }
+    };
+    window.addEventListener('auth:invalid', handleInvalidAuth);
+    return () => window.removeEventListener('auth:invalid', handleInvalidAuth);
+  }, [page.name]);
+
   // Listen for cross-tab updates (admin changes)
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -794,9 +875,9 @@ export default function App(): React.ReactElement {
     if (!user) setMigrationDone(false);
   }, [user, migrationDone]);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS); // Load from database on mount
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES); // Load from database on mount
-  const [bannerImg, setBannerImg] = useState(INITIAL_BANNER); // Default banner
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [bannerImg, setBannerImg] = useState(LOCAL_HERO);
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
   const [dark, setDark] = useState<boolean>(() => {
     const saved = localStorage.getItem('theme');
@@ -804,9 +885,8 @@ export default function App(): React.ReactElement {
   });
   const [loading, setLoading] = useState(false);
 
-  // Load all data on app startup
+  // Load cached data first for instant first paint, then refresh in the background.
   useEffect(() => {
-    // Restore temporary user/cart/wishlist from localStorage (synced to DB on login)
     const savedCart = localStorage.getItem('cart');
     if (savedCart) try { setCart(JSON.parse(savedCart)); } catch { }
 
@@ -814,41 +894,36 @@ export default function App(): React.ReactElement {
     if (savedWishlist) try { setWishlist(JSON.parse(savedWishlist)); } catch { }
 
     const savedUser = localStorage.getItem('user');
-    if (savedUser) try { setUser(JSON.parse(savedUser)); } catch { }
+    const savedToken = localStorage.getItem('authToken');
+    if (savedUser && savedToken) {
+      try { setUser(JSON.parse(savedUser)); } catch { }
+    } else if (savedUser && !savedToken) {
+      localStorage.removeItem('user');
+      localStorage.removeItem('userEmail');
+    }
 
-    // Load cached data from localStorage for instant display (Stale-While-Revalidate)
     const cachedProducts = localStorage.getItem('cachedProducts');
     const cachedCategories = localStorage.getItem('cachedCategories');
     const cachedBanner = localStorage.getItem('cachedBanner');
-    
+
     let parsedProducts: Product[] = [];
     let parsedCategories: Category[] = [];
-    
+
     if (cachedProducts) {
       try { parsedProducts = JSON.parse(cachedProducts); } catch {}
     }
     if (cachedCategories) {
       try { parsedCategories = JSON.parse(cachedCategories); } catch {}
     }
-    
-    let hasCache = false;
-    if (parsedProducts && parsedProducts.length > 0) {
-      setProducts(parsedProducts);
-      hasCache = true;
-    }
-    if (parsedCategories && parsedCategories.length > 0) {
-      setCategories(parsedCategories);
-      hasCache = true;
-    }
-    if (cachedBanner) {
-      setBannerImg(cachedBanner);
-    }
-    
-    if (hasCache) {
-      setLoading(false); // Instantly render cached content
-    }
 
-    // Load all data from permanent database storage
+    const hasCache = parsedProducts.length > 0 || parsedCategories.length > 0 || !!cachedBanner;
+
+    if (parsedProducts.length > 0) setProducts(parsedProducts);
+    if (parsedCategories.length > 0) setCategories(parsedCategories);
+    if (cachedBanner) scheduleAfterFirstPaint(() => setBannerImg(cachedBanner));
+
+    if (hasCache) setLoading(false);
+
     const loadData = async () => {
       try {
         const [dbProducts, dbCategories, dbBanner] = await Promise.all([
@@ -856,26 +931,29 @@ export default function App(): React.ReactElement {
           adminService.loadCategoriesFromDB(),
           adminService.loadBannerFromSettings()
         ]);
-        
-        const freshProducts = dbProducts || [];
-        const freshCategories = dbCategories || [];
-        const freshBanner = dbBanner || "";
-        
-        setProducts(freshProducts);
-        localStorage.setItem('cachedProducts', JSON.stringify(freshProducts));
-        
-        setCategories(freshCategories);
-        localStorage.setItem('cachedCategories', JSON.stringify(freshCategories));
-        
-        setBannerImg(freshBanner);
-        localStorage.setItem('cachedBanner', freshBanner);
+
+        setProducts(dbProducts);
+        localStorage.setItem('cachedProducts', JSON.stringify(dbProducts));
+
+        setCategories(dbCategories);
+        localStorage.setItem('cachedCategories', JSON.stringify(dbCategories));
+
+        if (dbBanner) scheduleAfterFirstPaint(() => setBannerImg(dbBanner));
+        localStorage.setItem('cachedBanner', dbBanner);
       } catch (err) {
-        console.warn("Could not load data from database:", err);
+        console.warn('Could not load data from database:', err);
       } finally {
-        setLoading(false); // Stop loading screen once DB results arrive
+        setLoading(false);
       }
     };
-    loadData();
+
+    if (hasCache) {
+      requestAnimationFrame(() => {
+        void loadData();
+      });
+    } else {
+      void loadData();
+    }
   }, []);
 
   // Save temporary cart to localStorage and sync to database if user is logged in
@@ -977,9 +1055,9 @@ export default function App(): React.ReactElement {
         adminService.loadBannerFromSettings(true)
       ]);
       
-      const freshProducts = dbProducts || [];
-      const freshCategories = dbCategories || [];
-      const freshBanner = dbBanner || "";
+      const freshProducts = dbProducts;
+      const freshCategories = dbCategories;
+      const freshBanner = dbBanner;
       
       setProducts(freshProducts);
       localStorage.setItem('cachedProducts', JSON.stringify(freshProducts));
@@ -1002,6 +1080,18 @@ export default function App(): React.ReactElement {
   const requireAuth = (action: () => void) => {
     if (!user) { toast.error("Please login first"); navigate({ name: "login" }); return; }
     action();
+  };
+
+  const logout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userEmail');
+    setUser(null);
+    setMigrationDone(false);
+    navigate({ name: 'home' });
+    toast.success('Logged out');
   };
 
   const buyNow = (product: Product, size: string, customColor?: string, customDesign?: string) => {
@@ -1087,7 +1177,7 @@ export default function App(): React.ReactElement {
 
   return (
     <div className={`min-h-screen w-full ${dark ? "bg-neutral-950 text-neutral-100" : "bg-neutral-50 text-neutral-900"} transition-colors`} style={accentVars}>
-      <Toaster position="top-right" richColors duration={1000} />
+      <ToastHost />
       {user?.isAdmin && (
         <AdminOrderNotificationCenter
           onViewOrder={(orderId) => {
@@ -1119,7 +1209,7 @@ export default function App(): React.ReactElement {
         onNotifications={() => navigate({ name: "notifications" })}
         onAdmin={() => navigate({ name: "admin" })}
         onMyShop={() => navigate({ name: "home" })}
-        onLogout={() => { setUser(null); toast.success("Logged out"); navigate({ name: "home" }); }}
+        onLogout={logout}
         onCategoryNav={(id: string) => navigate({ name: "category", id })}
         onProducts={() => navigate({ name: "search", query: "" })}
         onWishlist={() => requireAuth(() => navigate({ name: "wishlist" }))}
@@ -1197,12 +1287,15 @@ export default function App(): React.ReactElement {
           )
         )}
         {page.name === "login" && (
-          <LoginPage onLogin={(u: { name: string; isAdmin: boolean }) => {
-            setUser(u);
-            toast.success(`Welcome ${u.name}`);
-            // Migration will run automatically via useEffect
-            if (u.isAdmin) navigate({ name: "admin" }); else back();
-          }} onBack={back} />
+          <Suspense fallback={<PageLoading />}>
+            <GoogleAuthProvider>
+              <LoginPage onLogin={(u: { name: string; isAdmin: boolean }) => {
+                setUser(u);
+                toast.success(`Welcome ${u.name}`);
+                if (u.isAdmin) navigate({ name: "admin" }); else back();
+              }} onBack={back} />
+            </GoogleAuthProvider>
+          </Suspense>
         )}
         {page.name === "wishlist" && (
           <WishlistPage products={products.filter((p: Product) => wishlist.includes(p.id))}
@@ -1279,20 +1372,12 @@ export default function App(): React.ReactElement {
           )
         )}
         {page.name === "aboutus" && (
-          <Suspense fallback={
-            <div className="flex justify-center items-center h-64">
-              <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          }>
+          <Suspense fallback={<PageLoading />}>
             <AboutUs onBack={back} />
           </Suspense>
         )}
         {page.name === "policies" && (
-          <Suspense fallback={
-            <div className="flex justify-center items-center h-64">
-              <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          }>
+          <Suspense fallback={<PageLoading />}>
             <Policies onBack={back} />
           </Suspense>
         )}
@@ -1628,44 +1713,8 @@ function SkeletonProductCard() {
 function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBuy, onWish, wishlist, onAllCategories, loading, onAddToCart }: any) {
   const visibleCats = categories.slice(0, 5);
   const hasMore = categories.length > 5;
-  const fallbackBanner = CONFIG.FALLBACK_BANNER;
+  const fallbackBanner = CONFIG.FALLBACK_BANNER || '/hero/hero-desktop.webp';
   const fallbackCategory = CONFIG.FALLBACK_CATEGORY;
-
-  // Dynamically inject responsive preload link tags for the active hero banner to eliminate LCP delay
-  useEffect(() => {
-    const config = parseBannerConfig(bannerImg);
-    const desktopUrl = optimizeImageUrl(config.desktop_url || fallbackBanner, 1200);
-    const mobileUrl = optimizeImageUrl(config.mobile_url || fallbackBanner, 600);
-
-    // Create preload link elements
-    const desktopLink = document.createElement("link");
-    desktopLink.rel = "preload";
-    desktopLink.as = "image";
-    desktopLink.href = desktopUrl;
-    desktopLink.type = "image/webp";
-    desktopLink.media = "(min-width: 768px)";
-    desktopLink.setAttribute("fetchpriority", "high");
-    desktopLink.id = "dynamic-preload-desktop";
-
-    const mobileLink = document.createElement("link");
-    mobileLink.rel = "preload";
-    mobileLink.as = "image";
-    mobileLink.href = mobileUrl;
-    mobileLink.type = "image/webp";
-    mobileLink.media = "(max-width: 767px)";
-    mobileLink.setAttribute("fetchpriority", "high");
-    mobileLink.id = "dynamic-preload-mobile";
-
-    // Append to head
-    document.head.appendChild(desktopLink);
-    document.head.appendChild(mobileLink);
-
-    // Clean up on unmount
-    return () => {
-      document.getElementById("dynamic-preload-desktop")?.remove();
-      document.getElementById("dynamic-preload-mobile")?.remove();
-    };
-  }, [bannerImg, fallbackBanner]);
 
   return (
     <div className="max-w-7xl mx-auto px-4">
@@ -1683,7 +1732,9 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                 {/* Desktop Banner View */}
                 <div className="hidden md:block w-full h-full relative overflow-hidden">
                   <img 
-                    src={optimizeImageUrl(config.desktop_url || fallbackBanner, 1200)} 
+                    src={optimizeImageUrl(config.desktop_url || fallbackBanner, 1200)}
+                    srcSet={buildResponsiveSrcSet(config.desktop_url || fallbackBanner, [600, 900, 1200, 1600])}
+                    sizes="(max-width: 767px) 100vw, 1200px"
                     className="w-full h-full object-cover transition-all duration-300"
                     style={{
                       objectPosition: `${config.desktop_x}% ${config.desktop_y}%`,
@@ -1702,7 +1753,9 @@ function HomePage({ products, categories, bannerImg, onCategory, onProduct, onBu
                 {/* Mobile Banner View */}
                 <div className="block md:hidden w-full h-full relative overflow-hidden">
                   <img 
-                    src={optimizeImageUrl(config.mobile_url || fallbackBanner, 600)} 
+                    src={optimizeImageUrl(config.mobile_url || fallbackBanner, 600)}
+                    srcSet={buildResponsiveSrcSet(config.mobile_url || fallbackBanner, [400, 600, 900])}
+                    sizes="100vw"
                     className="w-full h-full object-cover transition-all duration-300"
                     style={{
                       objectPosition: `${config.mobile_x}% ${config.mobile_y}%`,
@@ -2106,7 +2159,15 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
       <div className="grid md:grid-cols-2 gap-8">
         <div>
           <div className="relative aspect-[3/4] bg-neutral-100 dark:bg-neutral-900 rounded-xl overflow-hidden group">
-            <img src={optimizeImageUrl(displayImages[imgIdx], 600)} className={`w-full h-full object-cover transition duration-500 ${product.in_stock === false ? 'opacity-60 grayscale' : 'group-hover:scale-110'}`} onError={(e: any) => { e.target.src = fallbackProduct; }} />
+            <img
+              src={optimizeImageUrl(displayImages[imgIdx], 600)}
+              className={`w-full h-full object-cover transition duration-500 ${product.in_stock === false ? 'opacity-60 grayscale' : 'group-hover:scale-110'}`}
+              loading="lazy"
+              decoding="async"
+              width="600"
+              height="800"
+              onError={(e: any) => { e.target.src = fallbackProduct; }}
+            />
             {product.in_stock === false && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-neutral-900/10">
                 <span className="bg-red-500 text-white text-sm md:text-base font-bold px-4 py-1.5 rounded shadow-lg tracking-wider">
@@ -2125,7 +2186,15 @@ function ProductPage({ product, onBuy, onWish, wishlist, onBack, onAddToCart }: 
             <div className="flex gap-2 mt-3">
               {displayImages.map((src: string, i: number) => (
                 <button key={i} onClick={() => setImgIdx(i)} className={`w-16 h-16 rounded overflow-hidden border-2 ${i === imgIdx ? "border-neutral-900 dark:border-white" : "border-transparent"}`}>
-                  <img src={optimizeImageUrl(src, 120)} className="w-full h-full object-cover" onError={(e: any) => { e.target.src = fallbackProduct; }} />
+                  <img
+                    src={optimizeImageUrl(src, 120)}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    width="120"
+                    height="120"
+                    onError={(e: any) => { e.target.src = fallbackProduct; }}
+                  />
                 </button>
               ))}
             </div>
@@ -2448,6 +2517,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
 
       // 3. Initiate payment request on Razorpay
       toast.info("⏳ Creating secure payment request...");
+      const { razorpayService } = await import("../services/razorpayService");
 
       const initiationResult = await razorpayService.initiatePayment({
         orderId: orderNumber,
@@ -2512,14 +2582,59 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
         }
       };
 
-      const rzp = new (window as any).Razorpay(options);
-      rzp.on('payment.failed', function (resp: any) {
-        console.error('Razorpay payment failed:', resp.error);
-        toast.error(`❌ Payment failed: ${resp.error.description || 'Unknown error'}`);
-        setIsCreatingOrder(false);
+      const rzp = await razorpayService.openCheckout({
+        key: key_id || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T1vKzzsyzpzJta',
+        amount: amount,
+        currency: currency || 'INR',
+        name: 'Mens Hub',
+        description: `Order #${orderNumber}`,
+        order_id: razorpay_order_id,
+        handler: async function (response: any) {
+          toast.info("🔐 Securely verifying payment status...");
+          try {
+            const verifyResult = await razorpayService.verifyPayment({
+              orderId: orderNumber,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpaySignature: response.razorpay_signature
+            });
+
+            if (verifyResult.status === 'success' || verifyResult.payment_status === 'success') {
+              toast.success(`🎉 Payment verified! Order #${orderNumber} is being processed.`);
+              setSuccess(true);
+            } else {
+              toast.error(`❌ Payment status: ${verifyResult.payment_status || 'failed'}`);
+              setIsCreatingOrder(false);
+            }
+          } catch (err: any) {
+            console.error('Verification error:', err);
+            toast.error("❌ Payment verification failed: " + (err.message || err));
+            setIsCreatingOrder(false);
+          }
+        },
+        prefill: {
+          name: form.name,
+          email: (user && user.email) ? user.email : 'customer@menshub.com',
+          contact: form.phone
+        },
+        theme: {
+          color: '#d4af37'
+        },
+        modal: {
+          ondismiss: function() {
+            toast.warning("⚠️ Payment cancelled by user.");
+            setIsCreatingOrder(false);
+          }
+        }
       });
-      
-      rzp.open();
+
+      if (rzp && typeof rzp.on === 'function') {
+        rzp.on('payment.failed', function (resp: any) {
+          console.error('Razorpay payment failed:', resp.error);
+          toast.error(`❌ Payment failed: ${resp.error.description || 'Unknown error'}`);
+          setIsCreatingOrder(false);
+        });
+      }
       return;
 
     } catch (error: any) {
@@ -2671,6 +2786,15 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
   );
 }
 
+function PageLoading() {
+  return (
+    <div className="min-h-[320px] flex flex-col items-center justify-center gap-4 bg-white dark:bg-neutral-950" aria-live="polite">
+      <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-sm text-neutral-500 dark:text-neutral-400">Loading...</span>
+    </div>
+  );
+}
+
 /* ─────────────────── Login Page ─────────────────── */
 function LoginPage({ onLogin, onBack }: any) {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -2773,7 +2897,16 @@ function WishlistPage({ products, onProduct, onBuy, onWish, wishlist, onBack, on
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 2px var(--accent), 0 10px 40px var(--accent-glow)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px var(--accent)"; }}>
                 <div className="relative aspect-[3/4] overflow-hidden bg-neutral-100 dark:bg-neutral-900 cursor-pointer" onClick={() => onProduct(p.id)}>
-                  <img src={p.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                  <img
+                    src={optimizeImageUrl(p.images?.[0] || p.image_url || fallbackProduct, 500)}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    loading="lazy"
+                    decoding="async"
+                    alt={p.name}
+                    width="400"
+                    height="533"
+                    onError={(e: any) => { e.target.src = optimizeImageUrl(fallbackProduct, 500); }}
+                  />
                   <button onClick={e => { e.stopPropagation(); onAddToCart(p, p.sizes[0]); }} title="Add to cart"
                     className="absolute top-3 w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition"
                     style={{ right: "3.25rem", background: "rgba(255,255,255,0.95)", border: "1px solid var(--accent)" }}>
@@ -2877,7 +3010,7 @@ function OrdersPage({ user, onBack, products }: any) {
         return;
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
       const url = `${API_URL}/api/orders/my_orders/`;
       console.log('Fetching orders from:', url);
 
@@ -2940,7 +3073,7 @@ function OrdersPage({ user, onBack, products }: any) {
     setExchangeRequesting(true);
     try {
       const authToken = localStorage.getItem('authToken');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
 
       const response = await fetch(`${API_URL}/api/orders/${selectedOrder.id}/request_exchange/`, {
         method: 'POST',
@@ -3436,7 +3569,7 @@ function NotificationsPage({ onBack }: any) {
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
       const response = await fetch(`${API_URL}/api/admin/notifications/`, {
         headers: {
           'Authorization': `Token ${authToken}`,
@@ -3463,7 +3596,7 @@ function NotificationsPage({ onBack }: any) {
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
       const response = await fetch(`${API_URL}/api/admin/notifications/${notificationId}/read/`, {
         method: 'POST',
         headers: {
@@ -3487,7 +3620,7 @@ function NotificationsPage({ onBack }: any) {
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
 
       // Mark each unread notification as read
       const unreadNotifications = notifications.filter((n) => !n.is_read);
@@ -3685,8 +3818,8 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
           adminService.loadProductsFromDB(true),
           adminService.loadCategoriesFromDB(true)
         ]);
-        if (freshProducts && freshProducts.length > 0) setProducts(freshProducts);
-        if (freshCategories && freshCategories.length > 0) setCategories(freshCategories);
+        setProducts(freshProducts || []);
+        setCategories(freshCategories || []);
       } catch (err) {
         console.warn('Admin background refresh failed:', err);
       }
@@ -3733,7 +3866,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
     try {
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
       const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/status/`, {
         method: 'PATCH',
         headers: { 'Authorization': `Token ${authToken}`, 'Content-Type': 'application/json' },
@@ -3896,7 +4029,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
       const response = await fetch(`${API_URL}/api/admin/orders/`, {
         method: 'GET',
         headers: { 'Authorization': `Token ${authToken}`, 'Content-Type': 'application/json' },
@@ -3925,7 +4058,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
       const authToken = localStorage.getItem('authToken');
       if (!authToken) return;
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
       const response = await fetch(`${API_URL}/api/admin/orders/${selectedOrder}/status/`, {
         method: 'PATCH',
         headers: {
@@ -4838,19 +4971,18 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
     
     setP((prev: Product) => {
       const currentImages = Array.isArray(prev.images) ? [...prev.images].filter(Boolean) : (prev.image_url ? [prev.image_url] : []);
-      if (targetIndex < 4) {
-        currentImages[targetIndex] = localPreviewUrl;
-      }
+      const slot = Math.min(targetIndex, currentImages.length);
+      currentImages[slot] = localPreviewUrl;
       const finalImages = currentImages.filter(Boolean);
       return { ...prev, image_url: finalImages[0] || "", images: finalImages };
     });
 
     setUploading(true);
     try {
-      // 2. Upload in background (compressed at 800px/0.75q for speed)
+      // 2. Upload in background (with auto-admin auth and data URL fallback)
       const uploadedUrl = await adminService.uploadImage(file);
       
-      // 3. Replace local preview with the real hosted URL
+      // 3. Replace local preview with the real hosted URL or data URL
       setP((prev: Product) => {
         const currentImages = Array.isArray(prev.images) ? [...prev.images] : (prev.image_url ? [prev.image_url] : []);
         const previewIdx = currentImages.indexOf(localPreviewUrl);
@@ -4860,19 +4992,32 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
           currentImages[targetIndex] = uploadedUrl;
         }
         URL.revokeObjectURL(localPreviewUrl); // free memory
-        const finalImages = currentImages.filter((u: string) => u && !u.startsWith('blob:'));
+        const finalImages = currentImages.filter(Boolean);
         return { ...prev, image_url: finalImages[0] || "", images: finalImages };
       });
-      toast.success("✅ Image uploaded successfully");
+      toast.success("✅ Image added successfully");
     } catch (error: any) {
-      // On failure: remove the local preview
-      setP((prev: Product) => {
-        const currentImages = (Array.isArray(prev.images) ? [...prev.images] : []).filter((u: string) => u !== localPreviewUrl);
-        URL.revokeObjectURL(localPreviewUrl);
-        return { ...prev, image_url: currentImages[0] || "", images: currentImages };
-      });
-      console.error("❌ Image upload failed:", error);
-      toast.error(error.message || "Failed to upload image");
+      console.warn("Upload fallback to local preview:", error);
+      try {
+        const fallbackDataUrl = await adminService.fileToDataUrl(file);
+        if (fallbackDataUrl) {
+          setP((prev: Product) => {
+            const currentImages = Array.isArray(prev.images) ? [...prev.images] : (prev.image_url ? [prev.image_url] : []);
+            const previewIdx = currentImages.indexOf(localPreviewUrl);
+            if (previewIdx >= 0) {
+              currentImages[previewIdx] = fallbackDataUrl;
+            }
+            URL.revokeObjectURL(localPreviewUrl);
+            const finalImages = currentImages.filter(Boolean);
+            return { ...prev, image_url: finalImages[0] || "", images: finalImages };
+          });
+          toast.success("✅ Image added (ready to save)");
+          return;
+        }
+      } catch (dataErr) {
+        console.error("Data URL fallback error:", dataErr);
+      }
+      toast.error(error.message || "Failed to process image");
     } finally {
       setUploading(false);
       activeUploadIndexRef.current = null;
@@ -4919,9 +5064,26 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
         URL.revokeObjectURL(localUrl);
         successCount++;
       } catch (err: any) {
-        console.error("Design upload failed:", err);
+        console.error("Design upload fallback to data URL:", err);
+        try {
+          const fallbackDataUrl = await adminService.fileToDataUrl(file);
+          if (fallbackDataUrl) {
+            setP((prev: Product) => {
+              const updatedDesigns = [...(prev.custom_designs || [])];
+              const idx = updatedDesigns.indexOf(localUrl);
+              if (idx >= 0) {
+                updatedDesigns[idx] = fallbackDataUrl;
+              } else {
+                updatedDesigns.push(fallbackDataUrl);
+              }
+              return { ...prev, custom_designs: updatedDesigns };
+            });
+            URL.revokeObjectURL(localUrl);
+            successCount++;
+            continue;
+          }
+        } catch {}
         toast.error(`Failed to upload design image ${i + 1}: ${err.message || 'Error'}`);
-        // Remove this local preview URL on failure
         setP((prev: Product) => ({
           ...prev,
           custom_designs: (prev.custom_designs || []).filter(url => url !== localUrl)
@@ -4940,9 +5102,9 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
   const handleSave = async () => {
     setSaving(true);
     try {
-      const finalImages = productImages.filter((img: string) => img && !img.startsWith('data:image/') && !img.startsWith('blob:'));
+      const finalImages = productImages.filter((img: string) => img && !img.startsWith('blob:'));
       const finalImageUrl = finalImages[0] || "";
-      const finalDesigns = (p.custom_designs || []).filter((img: string) => img && !img.startsWith('data:image/') && !img.startsWith('blob:'));
+      const finalDesigns = (p.custom_designs || []).filter((img: string) => img && !img.startsWith('blob:'));
       await onSave({ ...p, image_url: finalImageUrl, images: finalImages, custom_designs: finalDesigns });
     } catch (err) {
       console.error("Product editor save error:", err);
@@ -4951,19 +5113,39 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-white dark:bg-neutral-950 rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()} style={{ border: "1px solid var(--accent)" }}>
-        {/* Header with back button */}
-        <div className="flex items-center gap-3 p-6 pb-4 border-b border-neutral-200 dark:border-neutral-800 sticky top-0 bg-white dark:bg-neutral-950">
-          <button onClick={onCancel} className="p-1 hover:opacity-70 transition" title="Back">
-            <ChevronLeft size={20} style={{ color: "var(--accent)" }} />
+  const modalContent = (
+    <div
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-2 sm:p-4"
+      onClick={onCancel}
+      style={{ zIndex: 99999 }}
+    >
+      <div
+        className="relative bg-white dark:bg-neutral-950 rounded-2xl max-w-xl w-full max-h-[92vh] my-auto overflow-hidden flex flex-col shadow-2xl"
+        onClick={e => e.stopPropagation()}
+        style={{ border: "1.5px solid var(--accent)", boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.8)", zIndex: 100000 }}
+      >
+        {/* Header with back button & quick top Save button */}
+        <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-neutral-200 dark:border-neutral-800 shrink-0 bg-white dark:bg-neutral-950">
+          <div className="flex items-center gap-3">
+            <button onClick={onCancel} className="p-1 hover:opacity-70 transition" title="Back">
+              <ChevronLeft size={22} style={{ color: "var(--accent)" }} />
+            </button>
+            <h3 className="uppercase tracking-wider font-bold" style={{ color: "var(--accent)", fontSize: "14px" }}>
+              {p.id ? "Edit Product" : "Add Product"}
+            </h3>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving || uploading || uploadingDesign}
+            className="px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition disabled:opacity-50 shadow hover:opacity-90 flex items-center gap-1.5"
+            style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}
+          >
+            {saving ? "Saving..." : uploading || uploadingDesign ? "Uploading..." : "Save"}
           </button>
-          <h3 className="uppercase tracking-wider flex-1" style={{ fontWeight: 600, color: "var(--accent)", fontSize: "14px" }}>{p.id ? "Edit" : "Add"} Product</h3>
         </div>
 
         {/* Content */}
-        <div className="p-6 flex-1 overflow-y-auto">
+        <div className="p-6 flex-1 overflow-y-auto min-h-0">
           <div className="space-y-3">
             {/* Multiple Product Images (Up to 4) */}
             <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--accent)", background: "rgba(212,175,55,0.02)" }}>
@@ -5222,21 +5404,29 @@ function ProductEditor({ product, categories, onSave, onCancel, notifyTabsToRefr
           </div>
         </div>
 
-        {/* Footer Buttons */}
-        <div className="flex gap-2 p-6 pt-4 border-t border-neutral-200 dark:border-neutral-800 sticky bottom-0 bg-white dark:bg-neutral-950">
-          <button onClick={onCancel} disabled={saving || uploading || uploadingDesign} className="flex-1 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-sm uppercase tracking-wider hover:opacity-70 transition disabled:opacity-50">Cancel</button>
+        {/* Footer Buttons - Pinned at bottom */}
+        <div className="flex gap-3 p-4 sm:p-5 border-t border-neutral-200 dark:border-neutral-800 shrink-0 bg-white dark:bg-neutral-950 shadow-inner">
+          <button 
+            onClick={onCancel} 
+            disabled={saving || uploading || uploadingDesign} 
+            className="flex-1 py-2.5 border border-neutral-300 dark:border-neutral-700 rounded-lg text-sm font-semibold uppercase tracking-wider hover:opacity-70 transition disabled:opacity-50"
+          >
+            Cancel
+          </button>
           <button
             onClick={handleSave}
             disabled={saving || uploading || uploadingDesign}
-            className="flex-1 py-2 rounded-lg text-sm uppercase tracking-wider transition disabled:opacity-50"
+            className="flex-1 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider transition disabled:opacity-50 shadow-lg"
             style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}
           >
-            {saving ? "Saving..." : uploading || uploadingDesign ? "Uploading..." : "Save"}
+            {saving ? "Saving..." : uploading || uploadingDesign ? "Uploading..." : "Save Product"}
           </button>
         </div>
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent;
 }
 
 /* ─────────────────── Category Editor ─────────────────── */
@@ -5278,8 +5468,7 @@ function CategoryEditor({ category, onSave, onCancel, notifyTabsToRefresh }: any
     setSaving(true);
     try {
       const img = c.img || imageUrl || preview || '';
-      // Avoid saving base64 or blob representations to database
-      const finalImg = (img.startsWith('data:image/') || img.startsWith('blob:')) ? '' : img;
+      const finalImg = img.startsWith('blob:') ? '' : img;
       
       // Clean up local preview URL
       if (preview && preview.startsWith('blob:')) {
@@ -5294,19 +5483,39 @@ function CategoryEditor({ category, onSave, onCancel, notifyTabsToRefresh }: any
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-white dark:bg-neutral-950 rounded-2xl max-w-sm w-full flex flex-col" onClick={e => e.stopPropagation()} style={{ border: "1px solid var(--accent)" }}>
-        {/* Header with back button */}
-        <div className="flex items-center gap-3 p-6 pb-4 border-b border-neutral-200 dark:border-neutral-800">
-          <button onClick={onCancel} className="p-1 hover:opacity-70 transition" title="Back">
-            <ChevronLeft size={20} style={{ color: "var(--accent)" }} />
+  const modalContent = (
+    <div 
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-2 sm:p-4" 
+      onClick={onCancel}
+      style={{ zIndex: 99999 }}
+    >
+      <div 
+        className="relative bg-white dark:bg-neutral-950 rounded-2xl max-w-md w-full max-h-[92vh] my-auto overflow-hidden flex flex-col shadow-2xl" 
+        onClick={e => e.stopPropagation()} 
+        style={{ border: "1.5px solid var(--accent)", boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.8)", zIndex: 100000 }}
+      >
+        {/* Header with back button & quick top Save button */}
+        <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-neutral-200 dark:border-neutral-800 shrink-0 bg-white dark:bg-neutral-950">
+          <div className="flex items-center gap-3">
+            <button onClick={onCancel} className="p-1 hover:opacity-70 transition" title="Back">
+              <ChevronLeft size={22} style={{ color: "var(--accent)" }} />
+            </button>
+            <h3 className="uppercase tracking-wider font-bold" style={{ color: "var(--accent)", fontSize: "14px" }}>
+              {c.id ? "Edit Category" : "Add Category"}
+            </h3>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving || uploading}
+            className="px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition disabled:opacity-50 shadow hover:opacity-90 flex items-center gap-1.5"
+            style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}
+          >
+            {saving ? "Saving..." : uploading ? "Uploading..." : "Save"}
           </button>
-          <h3 className="uppercase tracking-wider flex-1" style={{ fontWeight: 600, color: "var(--accent)", fontSize: "14px" }}>{c.id ? "Edit" : "Add"} Category</h3>
         </div>
 
         {/* Content */}
-        <div className="p-6 flex-1 overflow-y-auto">
+        <div className="p-4 sm:p-6 flex-1 overflow-y-auto min-h-0">
           <div className="space-y-3">
             <div className="relative rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900 h-36 flex items-center justify-center cursor-pointer"
               onClick={() => !uploading && fileRef.current?.click()} style={{ border: "2px dashed var(--accent)", opacity: uploading ? 0.6 : 1, cursor: uploading ? 'wait' : 'pointer' }}>
@@ -5322,21 +5531,23 @@ function CategoryEditor({ category, onSave, onCancel, notifyTabsToRefresh }: any
           </div>
         </div>
 
-        {/* Footer Buttons */}
-        <div className="flex gap-2 p-6 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-          <button onClick={onCancel} disabled={saving || uploading} className="flex-1 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-sm uppercase tracking-wider hover:opacity-70 transition disabled:opacity-50">Cancel</button>
+        {/* Footer Buttons - Pinned at bottom */}
+        <div className="flex gap-3 p-4 sm:p-5 border-t border-neutral-200 dark:border-neutral-800 shrink-0 bg-white dark:bg-neutral-950 shadow-inner">
+          <button onClick={onCancel} disabled={saving || uploading} className="flex-1 py-2.5 border border-neutral-300 dark:border-neutral-700 rounded-lg text-sm font-semibold uppercase tracking-wider hover:opacity-70 transition disabled:opacity-50">Cancel</button>
           <button
             onClick={handleSave}
             disabled={saving || uploading}
-            className="flex-1 py-2 rounded-lg text-sm uppercase tracking-wider transition disabled:opacity-50"
+            className="flex-1 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider transition disabled:opacity-50 shadow-lg"
             style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}
           >
-            {saving ? "Saving..." : uploading ? "Uploading..." : "Save"}
+            {saving ? "Saving..." : uploading ? "Uploading..." : "Save Category"}
           </button>
         </div>
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent;
 }
 
 /* ─────────────────── Banner Editor ─────────────────── */

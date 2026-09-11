@@ -142,6 +142,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Media files (User uploaded files and product images)
 MEDIA_URL = '/media/'
@@ -151,7 +152,15 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'menshum_productpics')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in config('CORS_ALLOWED_ORIGINS', default='', cast=str).split(',')
+    if origin.strip()
+]
+
+if CORS_ALLOW_ALL_ORIGINS:
+    CORS_ALLOWED_ORIGINS = []
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -179,7 +188,7 @@ INSTAMOJO_AUTH_TOKEN = config('INSTAMOJO_AUTH_TOKEN', default='1c76a2badc5509235
 INSTAMOJO_SALT = config('INSTAMOJO_SALT', default='72cd8ff2f5ad408380498ff1d56fa054')
 INSTAMOJO_MODE = config('INSTAMOJO_MODE', default='PROD')
 FRONTEND_URL = config('FRONTEND_URL', default='https://menshub64.in')
-BACKEND_URL = config('BACKEND_URL', default='https://mens-hub-backend.onrender.com')
+BACKEND_URL = config('BACKEND_URL', default='https://api.menshub64.in')
 
 # Razorpay Payment Gateway Configuration
 RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')

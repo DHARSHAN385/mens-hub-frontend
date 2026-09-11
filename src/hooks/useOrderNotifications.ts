@@ -82,7 +82,9 @@ export const useOrderNotifications = (options: UseOrderNotificationsOptions = {}
       localStorage.getItem('access_token') ||
       '';
 
-    const apiURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    const apiURL = (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+      ? 'http://localhost:8000'
+      : (import.meta.env.VITE_API_URL || 'https://api.menshub64.in'));
     // Handle both http and https
     const wsBase = apiURL
       .replace(/^https/, 'wss')

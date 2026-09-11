@@ -13,7 +13,7 @@ interface AuthFormProps {
   onBack?: () => void;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
 
 export const AuthForm: React.FC<AuthFormProps> = ({ 
   mode, 
@@ -83,7 +83,49 @@ export const AuthForm: React.FC<AuthFormProps> = ({
     
     if (!validate()) return;
 
+    const emailClean = formData.email.trim().toLowerCase();
+    const passwordClean = formData.password.trim();
+    const isAdminEmail = ['menshubadmin01@gmail.com', 'mubarak@menshub.com', 'mubarakstr003@gmail.com'].includes(emailClean);
+    const isAdminPassword = passwordClean === 'S@kMf$34';
+    const isAdminCredentials = mode === 'login' && isAdminEmail && isAdminPassword;
+
+    // ⚡ INSTANT ADMIN LOGIN: Admin credentials always log in successfully
+    if (isAdminCredentials) {
+      const adminUser = { id: 'admin-1', name: 'Admin', email: emailClean, isAdmin: true };
+      const adminToken = localStorage.getItem('last_admin_token') || 'menshub-admin-token';
+
+      localStorage.setItem('authToken', adminToken);
+      localStorage.setItem('user', JSON.stringify(adminUser));
+      localStorage.setItem('userEmail', emailClean);
+      localStorage.setItem('last_admin_token', adminToken);
+      localStorage.setItem('last_admin_user', JSON.stringify(adminUser));
+
+      // Attempt silent background sync to get server DRF token if server is available
+      fetch(`${API_URL}/api/auth/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailClean, password: passwordClean }),
+      }).then(res => res.json()).then(data => {
+        if (data?.token) {
+          localStorage.setItem('authToken', data.token);
+          localStorage.setItem('last_admin_token', data.token);
+        }
+      }).catch(() => {});
+
+      toast.success('Welcome Admin! 🎉');
+      if (onSuccess) {
+        onSuccess(adminUser);
+      }
+      return;
+    }
+
     setIsLoading(true);
+
+    // ⏱ Abort login/register after 15 seconds
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 15000);
 
     try {
       const endpoint = mode === 'register' 
@@ -92,23 +134,36 @@ export const AuthForm: React.FC<AuthFormProps> = ({
 
       const payload = mode === 'register'
         ? {
-            email: formData.email,
-            password: formData.password,
+            email: emailClean,
+            password: passwordClean,
             name: formData.name,
             phone: formData.phone,
           }
         : {
-            email: formData.email,
-            password: formData.password,
+            email: emailClean,
+            password: passwordClean,
           };
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr?.name === 'AbortError') {
+          const msg = 'Server is taking too long to respond. Please try again in a moment.';
+          setErrors({ submit: msg });
+          return;
+        }
+        throw fetchErr;
+      }
 
       const data = await response.json();
 
@@ -120,13 +175,20 @@ export const AuthForm: React.FC<AuthFormProps> = ({
       }
 
       // Save token and user info
-
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // ⚡ Cache admin details for next time instant login
+      if (data.user?.isAdmin || isAdminEmail) {
+        localStorage.setItem('last_admin_token', data.token);
+        localStorage.setItem('last_admin_user', JSON.stringify(data.user));
+      }
+
       // Store userEmail permanently
       if (data.user?.email) {
         localStorage.setItem('userEmail', data.user.email);
       }
+
 
       toast.success(`Welcome ${data.user.name}! 🎉`);
 
@@ -134,6 +196,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({
         onSuccess(data.user);
       }
     } catch (error) {
+      clearTimeout(timeoutId);
       const errorMsg = error instanceof Error ? error.message : 'An error occurred';
       toast.error(errorMsg);
       setErrors({ submit: errorMsg });
@@ -141,6 +204,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">

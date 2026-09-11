@@ -41,7 +41,7 @@ interface CreateOrderResponse {
   };
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
 
 export const OrderCreationExample: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);

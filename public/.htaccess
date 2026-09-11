@@ -1,15 +1,35 @@
 # ========================================================
-# Mens Hub — Simplified High Performance .htaccess
-# Optimized for LiteSpeed & Apache response times
+# Mens Hub — SPA + Static Asset Hosting Fix
+# Prevent asset files from being rewritten to index.html
 # ========================================================
 
-# 1. SPA Routing (React Router)
+<IfModule mod_mime.c>
+  AddType text/css .css
+  AddType application/javascript .js
+  AddType application/wasm .wasm
+  AddType image/svg+xml .svg
+</IfModule>
+
+# 1. SPA Routing (React Router) — but exclude real files and built assets
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Keep built assets accessible
+  RewriteRule ^assets/ - [L]
+  RewriteRule ^favicon\.png$ - [L]
+  RewriteRule ^favicon\.webp$ - [L]
+  RewriteRule ^hero/ - [L]
+  RewriteRule ^robots\.txt$ - [L]
+  RewriteRule ^sitemap\.xml$ - [L]
+  RewriteRule ^fallbacks/ - [L]
+
+  # Prevent rewrite of existing files and directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Serve SPA shell for client-side routes only
   RewriteRule . /index.html [L]
 </IfModule>
 
@@ -18,24 +38,20 @@
   AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>
 
-# 3. Simple & Fast Cache-Control Headers (No dynamic Expires calculations)
+# 3. Cache-Control Headers
 <IfModule mod_headers.c>
-  # 1 year cache for static assets (hashed JS/CSS/Fonts)
-  <FilesMatch "\.(js|css|woff|woff2|ttf)$">
+  <FilesMatch "\.(js|css|mjs|woff|woff2|ttf)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
 
-  # 1 month cache for images
   <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|ico)$">
     Header set Cache-Control "public, max-age=2592000"
   </FilesMatch>
 
-  # Always revalidate index.html (never serve stale index.html)
   <FilesMatch "\.html$">
     Header set Cache-Control "public, max-age=0, must-revalidate"
   </FilesMatch>
 
-  # Security headers
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-XSS-Protection "1; mode=block"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"

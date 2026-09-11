@@ -36,7 +36,8 @@ export default function AboutUs({ onBack }: { onBack: () => void }) {
             src={heroImage} 
             alt="Mens Hub Sartorial Tailoring" 
             className="w-full h-full object-cover filter brightness-[0.35] contrast-[1.05]"
-            loading="eager"
+            loading="lazy"
+            decoding="async"
           />
         </div>
 

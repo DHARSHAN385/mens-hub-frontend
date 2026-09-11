@@ -3,7 +3,7 @@
 
 import { apiCall } from '../api/client';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://mens-hub-backend.onrender.com';
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
 
 export interface Product {
   id?: number;
