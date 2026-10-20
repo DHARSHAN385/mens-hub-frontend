@@ -2,6 +2,7 @@
 // Handles admin product and category management with database persistence
 
 import { apiCall } from '../api/client';
+import { normalizeMediaUrl } from '../api/mediaUrl';
 
 const BACKEND_URL = (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
   ? 'http://localhost:8000'
@@ -32,16 +33,7 @@ export const clearCache = () => {
  * @returns {string} Absolute URL or original URL if it's already absolute
  */
 const processImageUrl = (imageUrl?: string): string => {
-  if (!imageUrl) return '';
-  
-  let result = imageUrl;
-  // If it's a relative URL (starts with /), prepend the active backend URL
-  if (imageUrl.startsWith('/')) {
-    result = `${BACKEND_URL}${imageUrl}`;
-  }
-  
-  // Replace spaces with %20 so browsers can load them correctly without URL formatting errors
-  return result.replace(/ /g, '%20');
+  return normalizeMediaUrl(imageUrl);
 };
 
 /**
@@ -371,41 +363,53 @@ export const saveCategory = async (category: any): Promise<any> => {
       throw new Error('Not authenticated');
     }
 
+    const safeName = String(category?.name ?? '').trim();
+    if (!safeName) {
+      throw new Error('Category name is required');
+    }
+
     let image = category.img || '';
-    // Don't send base64 or blob images, only send URLs
-    if (image && (image.startsWith('data:image/') || image.startsWith('blob:'))) {
-      console.warn('⚠ Skipping base64 or blob image, saving without image');
+    if (typeof image === 'string' && image.startsWith('blob:')) {
       image = '';
     }
+    // Don't send base64 or blob images, only send URLs.
+    if (typeof image === 'string' && image.startsWith('data:image/')) {
+      console.warn('⚠ Skipping base64 image, saving without image');
+      image = '';
+    }
+
     const backendCategory: AdminCategory = {
-      name: category.name,
-      img: image, // Only URL, no base64
+      name: safeName,
+      img: image,
     };
 
-    // Update existing category (only if ID is numeric)
-    if (category.id && typeof category.id === 'number') {
-      backendCategory.id = category.id;
+    const rawCategoryId = category?.id;
+    const normalizedCategoryId = rawCategoryId !== undefined && rawCategoryId !== null && rawCategoryId !== '' && !String(rawCategoryId).startsWith('temp-')
+      ? Number(rawCategoryId)
+      : null;
+
+    // Update existing category when the ID is present and numeric.
+    if (normalizedCategoryId !== null && Number.isFinite(normalizedCategoryId)) {
       try {
-        const response = await apiCall(`/api/categories/${category.id}/`, 'PUT', backendCategory);
+        const response = await apiCall(`/api/categories/${normalizedCategoryId}/`, 'PUT', backendCategory);
         console.log('✅ Category PERMANENTLY updated in DB:', response);
         clearCache();
-        return response ? { ...response, img: processImageUrl(response.img) } : { ...backendCategory, id: category.id };
+        return response ? { ...response, img: processImageUrl(response.img) } : { ...backendCategory, id: normalizedCategoryId };
       } catch (error: any) {
         console.error('❌ Failed to update category in database:', error);
         throw new Error(`Failed to update category: ${error.message}`);
       }
     }
+
     // Create new category (ID will be assigned by backend)
-    else {
-      try {
-        const response = await apiCall('/api/categories/', 'POST', backendCategory);
-        console.log('✅ Category PERMANENTLY created in DB:', response);
-        clearCache();
-        return response ? { ...response, img: processImageUrl(response.img) } : backendCategory;
-      } catch (error: any) {
-        console.error('❌ Failed to create category in database:', error);
-        throw new Error(`Failed to create category: ${error.message}`);
-      }
+    try {
+      const response = await apiCall('/api/categories/', 'POST', backendCategory);
+      console.log('✅ Category PERMANENTLY created in DB:', response);
+      clearCache();
+      return response ? { ...response, img: processImageUrl(response.img) } : backendCategory;
+    } catch (error: any) {
+      console.error('❌ Failed to create category in database:', error);
+      throw new Error(`Failed to create category: ${error.message}`);
     }
   } catch (error) {
     console.error('Error saving category:', error);

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { CONFIG } from "./config";
+import { normalizeMediaUrl } from "../api/mediaUrl";
 import { cartService } from "../services/cartService";
 import { wishlistService } from "../services/wishlistService";
 
@@ -9,7 +10,16 @@ async function migrateLocalToDB() {
   const savedCart = localStorage.getItem('cart');
   if (savedCart) {
     try {
-      const cartItems = JSON.parse(savedCart);
+      const cartItems = (JSON.parse(savedCart) as CartItem[]).map((item) => ({
+        ...item,
+        product: {
+          ...item.product,
+          image_url: normalizeMediaUrl(item.product.image_url),
+          images: item.product.images?.map(normalizeMediaUrl),
+        },
+        customDesign: normalizeMediaUrl(item.customDesign),
+      }));
+      localStorage.setItem('cart', JSON.stringify(cartItems));
       await cartService.updateCart(cartItems);
       localStorage.removeItem('cart');
     } catch (e) {
@@ -122,7 +132,6 @@ export interface BannerConfig {
   mobile_y: number;
 }
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://api.menshub64.in';
 const LOCAL_HERO = '/hero/hero-desktop.webp';
 
 function scheduleAfterFirstPaint(callback: () => void): void {
@@ -130,16 +139,7 @@ function scheduleAfterFirstPaint(callback: () => void): void {
 }
 
 function absoluteUrl(url?: string): string {
-  if (!url) return '';
-  let result = url;
-  if (url.startsWith('/')) {
-    if (url.startsWith('/media/')) {
-      result = `https://menshub64.in${url}`;
-    } else if (url.startsWith('/api/')) {
-      result = `${BACKEND_URL}${url}`;
-    }
-  }
-  return result.replace(/ /g, '%20');
+  return normalizeMediaUrl(url);
 }
 
 export function optimizeImageUrl(url: string, width: number): string {
@@ -854,8 +854,35 @@ export default function App(): React.ReactElement {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
   const [history, setHistory] = useState<Page[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const savedCart = localStorage.getItem('cart');
+      const parsedCart = savedCart ? JSON.parse(savedCart) : [];
+      return Array.isArray(parsedCart) ? parsedCart.map((item: CartItem) => ({
+        ...item,
+        product: {
+          ...item.product,
+          image_url: item.product?.image_url ? normalizeMediaUrl(item.product.image_url) : item.product?.image_url,
+          images: Array.isArray(item.product?.images)
+            ? item.product.images.map((image) => normalizeMediaUrl(image))
+            : item.product?.images,
+        },
+      })) : [];
+    } catch (error) {
+      console.warn('Could not restore saved cart:', error);
+      return [];
+    }
+  });
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    try {
+      const savedWishlist = localStorage.getItem('wishlist');
+      const parsedWishlist = savedWishlist ? JSON.parse(savedWishlist) : [];
+      return Array.isArray(parsedWishlist) ? parsedWishlist : [];
+    } catch (error) {
+      console.warn('Could not restore saved wishlist:', error);
+      return [];
+    }
+  });
   const [user, setUser] = useState<{ name: string; email?: string; isAdmin: boolean } | null>(null);
   // Track if migration has run for this user (by user name)
   const [migrationDone, setMigrationDone] = useState(false);
@@ -887,12 +914,6 @@ export default function App(): React.ReactElement {
 
   // Load cached data first for instant first paint, then refresh in the background.
   useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    if (savedCart) try { setCart(JSON.parse(savedCart)); } catch { }
-
-    const savedWishlist = localStorage.getItem('wishlist');
-    if (savedWishlist) try { setWishlist(JSON.parse(savedWishlist)); } catch { }
-
     const savedUser = localStorage.getItem('user');
     const savedToken = localStorage.getItem('authToken');
     if (savedUser && savedToken) {
@@ -2409,6 +2430,24 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
   const [upiId, setUpiId] = useState("");
   const [success, setSuccess] = useState(false);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const cartItems = Array.isArray(cart) ? cart : [];
+  const checkoutItems = cartItems
+    .filter((item: CartItem) =>
+      item?.product &&
+      Number.isFinite(Number(item.product.price)) &&
+      Number(item.product.price) > 0 &&
+      Number.isInteger(Number(item.qty)) &&
+      Number(item.qty) > 0
+    )
+    .map((item: CartItem) => ({
+      ...item,
+      product: { ...item.product, price: Number(item.product.price) },
+      qty: Number(item.qty),
+    }));
+  const hasInvalidCartItems = checkoutItems.length !== cartItems.length;
+  const checkoutTotal = Math.round(
+    checkoutItems.reduce((sum: number, item: CartItem) => sum + item.product.price * item.qty, 0) * 100
+  ) / 100;
 
   /* Validate phone number: 10 digits, starts with 6, 7, 8, or 9 */
   const validatePhone = (phone: string): { valid: boolean; error?: string } => {
@@ -2456,6 +2495,10 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
   };
 
   const handlePaymentAndPlaceOrder = async () => {
+    if (hasInvalidCartItems || checkoutItems.length === 0 || checkoutTotal < 1) {
+      toast.error('Your cart is empty or invalid. Please return to your cart and try again.');
+      return;
+    }
     if (!localStorage.getItem('authToken')) {
       toast.error('Please login to place order');
       return;
@@ -2467,7 +2510,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
       const API_URL = CONFIG.API_URL;
 
       // 1. Format order items from cart
-      const orderItems = cart.map((item: CartItem) => ({
+      const orderItems = checkoutItems.map((item: CartItem) => ({
         id: item.product.id,
         name: item.product.name,
         price: item.product.price,
@@ -2495,7 +2538,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
           pincode: form.pincode,
           phone: form.phone,
           city: form.city,
-          total_amount: total,
+          total_amount: checkoutTotal,
           items: orderItems,
           status: 'pending',
           payment_method: 'upi',
@@ -2521,7 +2564,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
 
       const initiationResult = await razorpayService.initiatePayment({
         orderId: orderNumber,
-        amount: total,
+        amount: checkoutTotal,
         customerName: form.name,
         customerEmail: (user && user.email) ? user.email : 'customer@menshub.com',
         customerPhone: form.phone
@@ -2532,12 +2575,15 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
       if (!razorpay_order_id) {
         throw new Error("Did not receive Razorpay Order ID from backend");
       }
+      if (!key_id) {
+        throw new Error("Razorpay key is not configured on the backend");
+      }
 
       // 4. Open Razorpay Standard Checkout modal
       toast.info("💳 Opening secure payment gateway...");
       
       const options = {
-        key: key_id || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T1vKzzsyzpzJta',
+        key: key_id,
         amount: amount, // in paise
         currency: currency || 'INR',
         name: 'Mens Hub',
@@ -2582,51 +2628,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
         }
       };
 
-      const rzp = await razorpayService.openCheckout({
-        key: key_id || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T1vKzzsyzpzJta',
-        amount: amount,
-        currency: currency || 'INR',
-        name: 'Mens Hub',
-        description: `Order #${orderNumber}`,
-        order_id: razorpay_order_id,
-        handler: async function (response: any) {
-          toast.info("🔐 Securely verifying payment status...");
-          try {
-            const verifyResult = await razorpayService.verifyPayment({
-              orderId: orderNumber,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpayOrderId: response.razorpay_order_id,
-              razorpaySignature: response.razorpay_signature
-            });
-
-            if (verifyResult.status === 'success' || verifyResult.payment_status === 'success') {
-              toast.success(`🎉 Payment verified! Order #${orderNumber} is being processed.`);
-              setSuccess(true);
-            } else {
-              toast.error(`❌ Payment status: ${verifyResult.payment_status || 'failed'}`);
-              setIsCreatingOrder(false);
-            }
-          } catch (err: any) {
-            console.error('Verification error:', err);
-            toast.error("❌ Payment verification failed: " + (err.message || err));
-            setIsCreatingOrder(false);
-          }
-        },
-        prefill: {
-          name: form.name,
-          email: (user && user.email) ? user.email : 'customer@menshub.com',
-          contact: form.phone
-        },
-        theme: {
-          color: '#d4af37'
-        },
-        modal: {
-          ondismiss: function() {
-            toast.warning("⚠️ Payment cancelled by user.");
-            setIsCreatingOrder(false);
-          }
-        }
-      });
+      const rzp = await razorpayService.openCheckout(options);
 
       if (rzp && typeof rzp.on === 'function') {
         rzp.on('payment.failed', function (resp: any) {
@@ -2644,6 +2646,20 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
     }
 
   };
+
+  if (hasInvalidCartItems || checkoutItems.length === 0 || checkoutTotal < 1) {
+    return (
+      <div className="max-w-xl mx-auto p-8 text-center space-y-4">
+        <h2 className="text-xl font-semibold">Your cart is empty</h2>
+        <p className="text-neutral-600 dark:text-neutral-400">
+          Add an item to your cart before continuing to payment.
+        </p>
+        <button onClick={onBack} className="px-6 py-3 rounded-xl" style={{ background: "var(--accent-grad)", color: "var(--accent-fg)" }}>
+          Return to shopping
+        </button>
+      </div>
+    );
+  }
 
   if (success) return (
     <div className="max-w-md mx-auto px-4 py-16 text-center">
@@ -2746,7 +2762,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
           </div>
           <div className="p-4 border border-neutral-200 dark:border-neutral-800 rounded-xl">
             <div className="text-sm uppercase tracking-wider mb-2" style={{ color: "var(--accent)" }}>Order Items</div>
-            {cart.map((item: CartItem, i: number) => (
+            {checkoutItems.map((item: CartItem, i: number) => (
               <div key={i} className="flex justify-between text-sm py-1 border-b border-neutral-100 dark:border-neutral-900 last:border-b-0">
                 <span className="text-neutral-700 dark:text-neutral-300">{item.product.name} × {item.qty} (Size: {item.size})</span>
                 <span className="font-medium text-neutral-900 dark:text-neutral-100">₹{(item.product.price * item.qty).toLocaleString()}</span>
@@ -2755,7 +2771,7 @@ function CheckoutPage({ cart, total, user, onPlaced, onBack }: any) {
           </div>
           <div className="flex justify-between p-4 rounded-xl" style={{ border: "1px solid var(--accent)", background: "rgba(var(--accent-glow-rgb), 0.05)" }}>
             <span className="font-semibold text-neutral-800 dark:text-neutral-200">Total Bill Amount</span>
-            <span className="font-bold text-lg" style={{ color: "var(--accent)" }}>₹{total.toLocaleString()}</span>
+            <span className="font-bold text-lg" style={{ color: "var(--accent)" }}>₹{checkoutTotal.toLocaleString()}</span>
           </div>
           <button
             onClick={handlePaymentAndPlaceOrder}
@@ -3957,23 +3973,31 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
   };
 
   const saveCategory = async (c: Category) => {
+    const trimmedName = String(c.name ?? '').trim();
+    if (!trimmedName) {
+      toast.error('Category name is required.');
+      throw new Error('Category name is required');
+    }
+
     setSaving(true);
     const previousCategories = [...categories];
-    const tempId = c.id || `temp-${Date.now()}`;
-    const optimisticCategory = { ...c, id: tempId };
+    const categoryId = c.id;
+    const tempId = categoryId && String(categoryId).trim() && !String(categoryId).startsWith('temp-') ? categoryId : `temp-${Date.now()}`;
+    const sanitizedCategory = { ...c, name: trimmedName, id: tempId };
 
     // Update UI immediately (1ms)
     setCategories((arr: Category[]) => {
-      const idx = arr.findIndex(x => String(x.id) === String(c.id));
-      if (idx >= 0) { const copy = [...arr]; copy[idx] = optimisticCategory; return copy; }
-      return [...arr, optimisticCategory];
+      const idx = arr.findIndex(x => String(x.id) === String(categoryId));
+      if (idx >= 0) { const copy = [...arr]; copy[idx] = sanitizedCategory; return copy; }
+      return [...arr, sanitizedCategory];
     });
     setEditingCategory(null);
-    toast.success(c.id ? "Updating category..." : "Adding category...");
+    toast.success(categoryId ? "Updating category..." : "Adding category...");
     notifyTabsToRefresh();
 
     try {
-      const saved = await adminService.saveCategory(c);
+      const payload = { ...c, name: trimmedName };
+      const saved = await adminService.saveCategory(payload);
       setCategories((arr: Category[]) => {
         const idx = arr.findIndex(x => String(x.id) === String(tempId));
         if (idx >= 0) { const copy = [...arr]; copy[idx] = saved; return copy; }
@@ -3983,6 +4007,7 @@ function AdminPanel({ products, setProducts, categories, setCategories, bannerIm
       console.error("Failed to save category:", err);
       toast.error("Failed to save category. Rolling back changes.");
       setCategories(previousCategories);
+      throw err;
     } finally {
       setSaving(false);
     }
